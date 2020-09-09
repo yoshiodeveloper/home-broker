@@ -25,7 +25,7 @@ func TestCurrencyWithOneUnit(t *testing.T) {
 	}
 }
 
-func TestCurrencyOneUnitWithTwoCent(t *testing.T) {
+func TestCurrencyOneUnitWithTwoCents(t *testing.T) {
 	c := domain.NewCurrency(1, 200)
 	expected := domain.Currency(10200)
 	if c != expected {
@@ -33,7 +33,7 @@ func TestCurrencyOneUnitWithTwoCent(t *testing.T) {
 	}
 }
 
-func TestCurrencyTenUnitsAnd99Cent(t *testing.T) {
+func TestCurrencyTenUnitsAnd99Cents(t *testing.T) {
 	c := domain.NewCurrency(10, 9900)
 	expected := domain.Currency(109900)
 	if c != expected {
@@ -42,16 +42,48 @@ func TestCurrencyTenUnitsAnd99Cent(t *testing.T) {
 }
 
 func TestCurrencyWith4321Fractions(t *testing.T) {
-	c := domain.NewCurrency(999999, 4321)
-	expected := domain.Currency(9999994321)
+	c := domain.NewCurrency(9999999, 4321)
+	expected := domain.Currency(99999994321)
 	if c != expected {
 		t.Errorf(failTestMSG, c, expected)
 	}
 }
 
 func TestCurrencyFractionTruncation(t *testing.T) {
-	c := domain.NewCurrency(123456789, 987654321)
-	expected := domain.Currency(1234567899876)
+	c := domain.NewCurrency(9999999, 987654321)
+	expected := domain.Currency(99999999876)
+	if c != expected {
+		t.Errorf(failTestMSG, c, expected)
+	}
+}
+
+func TestCurrencyOneNegativeValue(t *testing.T) {
+	c := domain.NewCurrency(-1, 0)
+	expected := domain.Currency(-10000)
+	if c != expected {
+		t.Errorf(failTestMSG, c, expected)
+	}
+}
+
+func TestCurrencyHugeNegativeValue(t *testing.T) {
+	c := domain.NewCurrency(-9999999, 123456)
+	expected := domain.Currency(-99999991234)
+	if c != expected {
+		t.Errorf(failTestMSG, c, expected)
+	}
+}
+
+func TestCurrencyFractionNegativeValue(t *testing.T) {
+	c := domain.NewCurrency(9999999, -123456)
+	expected := domain.Currency(99999991234)
+	if c != expected {
+		t.Errorf(failTestMSG, c, expected)
+	}
+}
+
+func TestCurrencyBothPartsAsNegativeValue(t *testing.T) {
+	c := domain.NewCurrency(-9999999, -123456)
+	expected := domain.Currency(-99999991234)
 	if c != expected {
 		t.Errorf(failTestMSG, c, expected)
 	}
