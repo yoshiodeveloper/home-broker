@@ -9,111 +9,150 @@ const (
 	failTestMSG = "The result is %v. Expected %v."
 )
 
-func TestCurrencyWithZeroValue(t *testing.T) {
-	c := domain.NewCurrency(0, 0)
-	expected := domain.Currency(0)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
-	}
-}
+func TestCurrencyValues(t *testing.T) {
+	tests := []struct {
+		currency    domain.Currency
+		expectedInt int64
+	}{
+		// $0.0000
+		{domain.NewCurrency(0, 0), 0},
+		// $0.0009
+		{domain.NewCurrency(0, 9), 9},
+		// $0.0090
+		{domain.NewCurrency(0, 99), 99},
+		// $0.0900
+		{domain.NewCurrency(0, 999), 999},
+		// $0.9000
+		{domain.NewCurrency(0, 9999), 9999},
 
-func TestCurrencyWithOneUnit(t *testing.T) {
-	c := domain.NewCurrency(1, 0)
-	expected := domain.Currency(10000)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
-	}
-}
+		// $1.0
+		{domain.NewCurrency(1, 0), 10000},
+		// $1.0200 ($1.02)
+		{domain.NewCurrency(1, 200), 10200},
+		// $10.9900 ($10.99)
+		{domain.NewCurrency(10, 9900), 109900},
+		// $9999999.4321
+		{domain.NewCurrency(9999999, 4321), 99999994321},
+		// $9999999.987654321 to $9999999.9876
+		{domain.NewCurrency(9999999, 987654321), 99999999876},
 
-func TestCurrencyOneUnitWithTwoCents(t *testing.T) {
-	c := domain.NewCurrency(1, 200)
-	expected := domain.Currency(10200)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
-	}
-}
+		// -$0.0009
+		{domain.NewCurrency(0, -9), -9},
+		// -$0.0090
+		{domain.NewCurrency(0, -99), -99},
+		// -$0.0900
+		{domain.NewCurrency(0, -999), -999},
+		// -$0.9000
+		{domain.NewCurrency(0, -9999), -9999},
 
-func TestCurrencyTenUnitsAnd99Cents(t *testing.T) {
-	c := domain.NewCurrency(10, 9900)
-	expected := domain.Currency(109900)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
-	}
-}
+		// Special cases using double negatives.
+		{domain.NewCurrency(-9, -9), -90009},
+		{domain.NewCurrency(-9, -9999), -99999},
 
-func TestCurrencyWith4321Fractions(t *testing.T) {
-	c := domain.NewCurrency(9999999, 4321)
-	expected := domain.Currency(99999994321)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
+		// -$1.0
+		{domain.NewCurrency(-1, 0), -10000},
+		// -$1.0200 (-$1.02)
+		{domain.NewCurrency(-1, 200), -10200},
+		// -$10.9900 (-$10.99)
+		{domain.NewCurrency(-10, 9900), -109900},
+		// -$9,999,999.4321
+		{domain.NewCurrency(-9999999, 4321), -99999994321},
+		// -$9,999,999.987654321 to -$9,999,999.9876
+		{domain.NewCurrency(-9999999, 987654321), -99999999876},
 	}
-}
-
-func TestCurrencyFractionTruncation(t *testing.T) {
-	c := domain.NewCurrency(9999999, 987654321)
-	expected := domain.Currency(99999999876)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
-	}
-}
-
-func TestCurrencyOneNegativeValue(t *testing.T) {
-	c := domain.NewCurrency(-1, 0)
-	expected := domain.Currency(-10000)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
-	}
-}
-
-func TestCurrencyHugeNegativeValue(t *testing.T) {
-	c := domain.NewCurrency(-9999999, 123456)
-	expected := domain.Currency(-99999991234)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
-	}
-}
-
-func TestCurrencyFractionNegativeValue(t *testing.T) {
-	c := domain.NewCurrency(9999999, -123456)
-	expected := domain.Currency(99999991234)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
-	}
-}
-
-func TestCurrencyBothPartsAsNegativeValue(t *testing.T) {
-	c := domain.NewCurrency(-9999999, -123456)
-	expected := domain.Currency(-99999991234)
-	if c != expected {
-		t.Errorf(failTestMSG, c, expected)
+	for _, test := range tests {
+		if int64(test.currency) != test.expectedInt {
+			t.Errorf(failTestMSG, int64(test.currency), test.expectedInt)
+		}
 	}
 }
 
 func TestCurrencyAsFloat64(t *testing.T) {
-	c := domain.NewCurrency(123, 6789)
-	expected := 123.6789
-	result := c.AsFloat64()
-	if result != expected {
-		t.Errorf(failTestMSG, result, expected)
+	tests := []struct {
+		currency      domain.Currency
+		expectedFloat float64
+	}{
+		// $0.0
+		{domain.NewCurrency(0, 0), 0.0},
+		// $0.0009
+		{domain.NewCurrency(0, 9), 0.0009},
+		// $0.9000
+		{domain.NewCurrency(0, 9000), 0.9000},
+		// $0.0099
+		{domain.NewCurrency(0, 99), 0.0099},
+		// $0.0999
+		{domain.NewCurrency(0, 999), 0.0999},
+		// $0.9999
+		{domain.NewCurrency(0, 9999), 0.9999},
+		// $9.9999
+		{domain.NewCurrency(9, 9999), 9.9999},
+		// $9999999.999999 to $9999999.9999
+		{domain.NewCurrency(9999999, 999999), 9999999.9999},
+
+		// -$0.0009
+		{domain.NewCurrency(0, -9), -0.0009},
+		// -$0.9000
+		{domain.NewCurrency(0, -9000), -0.9000},
+		// -$0.0099
+		{domain.NewCurrency(0, -99), -0.0099},
+		// -$0.0999
+		{domain.NewCurrency(0, -999), -0.0999},
+		// -$0.9999
+		{domain.NewCurrency(0, -9999), -0.9999},
+		// -$9.9999
+		{domain.NewCurrency(-9, 9999), -9.9999},
+		// -$9999999.999999 to -$9999999.9999
+		{domain.NewCurrency(-9999999, 999999), -9999999.9999},
+	}
+	for _, test := range tests {
+		result := test.currency.AsFloat64()
+		if result != test.expectedFloat {
+			t.Errorf(failTestMSG, result, test.expectedFloat)
+		}
 	}
 }
 
 func TestCurrencyAsString(t *testing.T) {
-	c := domain.NewCurrency(123, 6789)
-	expected := "123.6789"
-	result := c.String()
-	if result != expected {
-		t.Errorf(failTestMSG, result, expected)
-	}
-}
+	tests := []struct {
+		currency       domain.Currency
+		expectedString string
+	}{
+		// $0.0
+		{domain.NewCurrency(0, 0), "0.0000"},
+		// $0.0009
+		{domain.NewCurrency(0, 9), "0.0009"},
+		// $0.9000
+		{domain.NewCurrency(0, 9000), "0.9000"},
+		// $0.0099
+		{domain.NewCurrency(0, 99), "0.0099"},
+		// $0.0999
+		{domain.NewCurrency(0, 999), "0.0999"},
+		// $0.9999
+		{domain.NewCurrency(0, 9999), "0.9999"},
+		// $9.9999
+		{domain.NewCurrency(9, 9999), "9.9999"},
+		// $9999999.999999 to $9999999.9999
+		{domain.NewCurrency(9999999, 999999), "9999999.9999"},
 
-/*
-func TestAddWalletFunds(t *testing.T) {
-	wallet := domain.NewWallet("1", 0.0)
-	credit := 10.0
-	wallet.Credit(credit)
-	if wallet.Balance != credit {
-		t.Errorf("Wallet balance is not %v, it is %v.", credit, wallet.Balance)
+		// -$0.0009
+		{domain.NewCurrency(0, -9), "-0.0009"},
+		// -$0.9000
+		{domain.NewCurrency(0, -9000), "-0.9000"},
+		// -$0.0099
+		{domain.NewCurrency(0, -99), "-0.0099"},
+		// -$0.0999
+		{domain.NewCurrency(0, -999), "-0.0999"},
+		// -$0.9999
+		{domain.NewCurrency(0, -9999), "-0.9999"},
+		// -$9.9999
+		{domain.NewCurrency(-9, 9999), "-9.9999"},
+		// -$9999999.999999 to -$9999999.9999
+		{domain.NewCurrency(-9999999, 999999), "-9999999.9999"},
+	}
+	for _, test := range tests {
+		result := test.currency.String()
+		if result != test.expectedString {
+			t.Errorf(failTestMSG, result, test.expectedString)
+		}
 	}
 }
-*/
