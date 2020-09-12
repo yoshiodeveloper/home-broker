@@ -1,7 +1,6 @@
-package postgresql_test
+package postgresql
 
 import (
-	"broker-dealer/infra/postgresql"
 	"reflect"
 	"testing"
 )
@@ -11,7 +10,7 @@ const (
 )
 
 func TestNewDBClient(t *testing.T) {
-	expected := postgresql.DBClient{
+	expected := DBClient{
 		Host:     "Host",
 		Port:     1234,
 		User:     "User",
@@ -19,7 +18,7 @@ func TestNewDBClient(t *testing.T) {
 		DBName:   "DBName",
 		SSLMode:  "SSLMode",
 	}
-	dbClient := postgresql.NewDBClient(expected.Host, expected.Port, expected.User, expected.Password, expected.DBName, expected.SSLMode)
+	dbClient := NewDBClient(expected.Host, expected.Port, expected.User, expected.Password, expected.DBName, expected.SSLMode)
 	if !reflect.DeepEqual(dbClient, expected) {
 		t.Errorf(failTestMSG, dbClient, expected)
 	}
