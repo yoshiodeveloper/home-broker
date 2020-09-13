@@ -10,7 +10,7 @@ const (
 )
 
 func TestNewDBClient(t *testing.T) {
-	expected := DBClient{
+	expected := &DBClient{
 		Host:     "Host",
 		Port:     1234,
 		User:     "User",

@@ -10,7 +10,6 @@ type UserID int64
 
 // User represents an user.
 type User struct {
-	Entity
 	ID        UserID
 	CreatedAt time.Time
 	UpdatedAt time.Time

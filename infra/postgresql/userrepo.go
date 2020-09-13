@@ -1,8 +1,8 @@
 package postgresql
 
 import (
-	"broker-dealer/domain"
-	"broker-dealer/infra"
+	"home-broker/domain"
+	"home-broker/infra"
 	"time"
 
 	"gorm.io/gorm"
@@ -26,21 +26,21 @@ func (GORMUser) TableName() string {
 	return "user"
 }
 
-// UserRepository handles database commands for user table.
-type UserRepository struct {
-	infra.UserRepository
+// UserRepo handles database commands for user table.
+type UserRepo struct {
+	infra.UserRepo
 	dbClient *DBClient
 }
 
-// NewUserRepository creates a new NewUserRepository.
-func NewUserRepository(dbClient *DBClient) UserRepository {
-	return UserRepository{
+// NewUserRepo creates a new NewUserRepo.
+func NewUserRepo(dbClient *DBClient) *UserRepo {
+	return &UserRepo{
 		dbClient: dbClient,
 	}
 }
 
 // ToEntity returns an User entity from the ORM model.
-func (repo *UserRepository) ToEntity(model *GORMUser) *domain.User {
+func (repo *UserRepo) ToEntity(model *GORMUser) *domain.User {
 	// "model.DeletedAt" is not a Time object. It is a struct with Time and Valid fields.
 	deletedAt := time.Time{} // A "time.Time" with zero value represents a "null".
 	if model.DeletedAt.Valid {
@@ -57,14 +57,11 @@ func (repo *UserRepository) ToEntity(model *GORMUser) *domain.User {
 }
 
 // GetByID gets an user from the database by an ID.
-func (repo *UserRepository) GetByID(id domain.UserID) (user domain.User, found bool, err error) {
+func (repo *UserRepo) GetByID(id domain.UserID) (user domain.User, found bool) {
 	gormUser := GORMUser{}
 	res := repo.dbClient.db.Take(&gormUser, id)
 	if res.Error == gorm.ErrRecordNotFound {
-		return user, false, nil
+		return user, false
 	}
-	if res.Error != nil {
-		return user, false, res.Error
-	}
-	return user, true, nil
+	return user, true
 }

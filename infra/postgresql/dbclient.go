@@ -1,8 +1,8 @@
 package postgresql
 
 import (
-	"broker-dealer/infra"
 	"fmt"
+	"home-broker/infra"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -21,8 +21,8 @@ type DBClient struct {
 }
 
 // NewDBClient creates a new database client.
-func NewDBClient(host string, port int, user string, password string, dbName string, sslMode string) DBClient {
-	return DBClient{
+func NewDBClient(host string, port int, user string, password string, dbName string, sslMode string) *DBClient {
+	return &DBClient{
 		Host:     host,
 		Port:     port,
 		User:     user,
