@@ -2,16 +2,12 @@ package postgresql_test
 
 import (
 	"home-broker/infra/postgresql"
-	"log"
-	"os"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 func GetTestDBClient() postgresql.DBClient {
@@ -34,18 +30,9 @@ func GetMockedDBClient() (postgresql.DBClient, sqlmock.Sqlmock) {
 		panic(err)
 	}
 
-	newLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
-		logger.Config{
-			SlowThreshold: time.Second,
-			LogLevel:      logger.Info,
-			Colorful:      true,
-		},
-	)
-
 	gormDB, err := gorm.Open(postgres.New(postgres.Config{
 		Conn: mockedDB,
-	}), &gorm.Config{Logger: newLogger})
+	}), &gorm.Config{})
 
 	dbClient.SetDB(gormDB)
 	return dbClient, mock

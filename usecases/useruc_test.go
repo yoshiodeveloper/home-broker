@@ -53,9 +53,10 @@ func TestUserUCGetUser_UserExists_ReturnsUser(t *testing.T) {
 	expectedEnt := GetTestUserEntity()
 	mockRepo := mocks.NewMockUserRepoI(mockCtrl)
 
+	retEnt := expectedEnt
 	mockRepo.EXPECT().
 		GetByID(expectedEnt.ID).
-		Return(&expectedEnt, nil)
+		Return(&retEnt, nil)
 
 	uc := usecases.NewUseCases(&infra.Repositories{UserRepo: mockRepo}).GetUserUC()
 
@@ -82,9 +83,10 @@ func TestUserUCGetUser_UserDoesNotExist_ReturnsCreatedUser(t *testing.T) {
 		GetByID(expectedEnt.ID).
 		Return(nil, nil)
 
+	retEnt := expectedEnt
 	mockRepo.EXPECT().
 		Insert(domain.User{ID: expectedEnt.ID}).
-		Return(&expectedEnt, nil)
+		Return(&retEnt, nil)
 
 	uc := usecases.NewUseCases(&infra.Repositories{UserRepo: mockRepo}).GetUserUC()
 
@@ -116,9 +118,10 @@ func TestUserUCGetUser_BetweenGetByIDAndInsertCalls_ReturnsUser(t *testing.T) {
 		Insert(domain.User{ID: expectedEnt.ID}).
 		Return(nil, fmt.Errorf("%w: ID %d", infra.ErrUserAlreadyExists, expectedEnt.ID))
 
+	retEnt := expectedEnt
 	mockRepo.EXPECT().
 		GetByID(expectedEnt.ID).
-		Return(&expectedEnt, nil)
+		Return(&retEnt, nil)
 
 	uc := usecases.NewUseCases(&infra.Repositories{UserRepo: mockRepo}).GetUserUC()
 

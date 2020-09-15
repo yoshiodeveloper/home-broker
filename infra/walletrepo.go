@@ -7,8 +7,11 @@ type WalletRepoI interface {
 	RepositoryI
 
 	// GetByUserID must return a wallet by an user ID.
-	GetByUserID(id domain.UserID) (*domain.Wallet, error)
+	GetByUserID(userID domain.UserID) (*domain.Wallet, error)
 
 	// Insert must insert a new wallet.
 	Insert(entity domain.Wallet) (*domain.Wallet, error)
+
+	// IncBalanceByUserID must increment or decrement the balance field by a user ID.
+	IncBalanceByUserID(userID domain.UserID, amount domain.Money) (*domain.Wallet, error)
 }

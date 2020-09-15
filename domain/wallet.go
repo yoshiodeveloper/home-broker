@@ -57,6 +57,11 @@ func (c *Money) Equal(v Money) bool {
 	return c.Number.Equal(v.Number)
 }
 
+// Add increments (or decrements) the value.
+func (c *Money) Add(v Money) Money {
+	return Money{Number: c.Number.Add(v.Number)}
+}
+
 // WalletID represents the Wallet ID type.
 //   This eases a future DB change.
 type WalletID int64

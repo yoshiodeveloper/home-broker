@@ -65,3 +65,13 @@ func (uc *WalletUC) GetWallet(userID domain.UserID) (entity *domain.Wallet, crea
 	// Unknown error.
 	return nil, false, userCreated, err
 }
+
+// IncBalance increments or decrements the wallet funds (balance).
+func (uc *WalletUC) IncBalance(userID domain.UserID, amount domain.Money) (entity *domain.Wallet, err error) {
+	repo := uc.repos.WalletRepo
+	entity, err = repo.IncBalanceByUserID(userID, amount)
+	if err != nil {
+		return nil, err
+	}
+	return entity, nil
+}

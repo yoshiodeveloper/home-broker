@@ -182,7 +182,7 @@ func TestWalletRepoGetByUserID_WalletWithUserIDExists_WalletReturned(t *testing.
 		WithArgs(int64(expectedEntity.UserID)).
 		WillReturnRows(mock.NewRows(columns).
 			AddRow(
-				int64(expectedEntity.ID), int64(expectedEntity.UserID), expectedEntity.Balance.AsFloat64(),
+				int64(expectedEntity.ID), int64(expectedEntity.UserID), expectedEntity.Balance.String(),
 				expectedEntity.CreatedAt, expectedEntity.UpdatedAt, nil))
 	entity, err := repo.GetByUserID(expectedEntity.UserID)
 	if err != nil {
@@ -308,5 +308,66 @@ func TestWalletRepoInsert_WalletUserIDDoesNotExist_UserDoesNotExistError(t *test
 	}
 	if newEntity != nil {
 		t.Errorf("wallet received \"%v\", expected nil", newEntity)
+	}
+}
+
+func TestWalletRepoIncBalanceByUserID(t *testing.T) {
+	repo, mock := GetMockedWalletRepo()
+	expectedEnt := GetTestWalletEntity()
+
+	addFunds := domain.NewMoneyFromString("999.999999")
+	balance := domain.NewMoneyFromString("1000.999999")
+	expectedEnt.Balance = balance.Add(addFunds)
+
+	mock.ExpectExec(`UPDATE "wallet" SET .+ WHERE.+"user_id"\s*=\s*\$3`).
+		WithArgs(
+			addFunds.Number,
+			sqlmock.AnyArg(),
+			int64(expectedEnt.UserID),
+		).WillReturnResult(sqlmock.NewResult(0, 1))
+
+	columns := []string{"id", "user_id", "balance", "created_at", "updated_at", "deleted_at"}
+
+	mock.ExpectQuery(`SELECT \* FROM "wallet".+WHERE.+"user_id"\s*=\s*\$1.*`).
+		WithArgs(int64(expectedEnt.UserID)).
+		WillReturnRows(mock.NewRows(columns).
+			AddRow(
+				int64(expectedEnt.ID), int64(expectedEnt.UserID), expectedEnt.Balance.String(),
+				expectedEnt.CreatedAt, expectedEnt.UpdatedAt, nil))
+
+	entity, err := repo.IncBalanceByUserID(expectedEnt.UserID, addFunds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	CheckWalletsAreEquals(t, *entity, expectedEnt)
+}
+
+func TestWalletRepoIncBalanceByUserID_WalletDoesNotExist_NoWalletReturned(t *testing.T) {
+	repo, mock := GetMockedWalletRepo()
+	expectedEnt := GetTestWalletEntity()
+
+	addFunds := domain.NewMoneyFromString("999.999999")
+	balance := domain.NewMoneyFromString("1000.999999")
+	expectedEnt.Balance = balance.Add(addFunds)
+
+	mock.ExpectExec(`UPDATE "wallet" SET .+ WHERE.+"user_id"\s*=\s*\$3`).
+		WithArgs(
+			addFunds.Number,
+			sqlmock.AnyArg(),
+			int64(expectedEnt.UserID),
+		).WillReturnResult(sqlmock.NewResult(0, 0))
+
+	columns := []string{"id", "user_id", "balance", "created_at", "updated_at", "deleted_at"}
+
+	mock.ExpectQuery(`SELECT \* FROM "wallet".+WHERE.+"user_id"\s*=\s*\$1.*`).
+		WithArgs(int64(expectedEnt.UserID)).
+		WillReturnRows(mock.NewRows(columns))
+
+	entity, err := repo.IncBalanceByUserID(expectedEnt.UserID, addFunds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entity != nil {
+		t.Errorf("wallet exists, expected as does not exist")
 	}
 }
