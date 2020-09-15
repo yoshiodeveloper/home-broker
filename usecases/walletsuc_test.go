@@ -1,68 +1,170 @@
-package usecases
+package usecases_test
 
 import (
+	"fmt"
 	"home-broker/domain"
 	"home-broker/infra"
 	"home-broker/mocks"
+	"home-broker/usecases"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 )
 
-// When we ask for an user's wallet and this user does not exist, this user must be created.
-//   The external service that calls our service will only pass on valid users.
-//   That's why we can create that user without performing any checks.
-func TestGetWallet_WalletAndUserDoNotExist_WalletAndUserAreCreated(t *testing.T) {
+var (
+	walletBaseTime = time.Date(2020, time.Month(2), 0, 0, 0, 0, 0, time.UTC)
+)
+
+func GetTestWalletEntity() domain.Wallet {
+	user := GetTestUserEntity()
+	return domain.Wallet{
+		ID:        domain.WalletID(9999),
+		UserID:    user.ID,
+		Balance:   domain.NewMoneyFromString("999999999.999999"),
+		CreatedAt: walletBaseTime,
+		UpdatedAt: walletBaseTime.Add(time.Hour * 2),
+		DeletedAt: time.Time{},
+	}
+}
+
+func GetTestWalletEntityWithDeletedAt() domain.Wallet {
+	entity := GetTestWalletEntity()
+	entity.DeletedAt = walletBaseTime.Add(time.Hour * 3)
+	return entity
+}
+
+func CheckWalletsAreEquals(t *testing.T, entityA domain.Wallet, entityB domain.Wallet) {
+	if entityA.ID != entityB.ID {
+		t.Errorf("wallet.ID is %v, expected %v", entityA.ID, entityB.ID)
+	}
+	if entityA.UserID != entityB.UserID {
+		t.Errorf("wallet.UserID is %v, expected %v", entityA.UserID, entityB.UserID)
+	}
+	if !entityA.Balance.Equal(entityB.Balance) {
+		t.Errorf("wallet.Balance is %v, expected %v", entityA.Balance, entityB.Balance)
+	}
+	if entityA.CreatedAt != entityB.CreatedAt {
+		t.Errorf("wallet.CreatedAt is %v, expected %v", entityA.CreatedAt, entityB.CreatedAt)
+	}
+	if entityA.UpdatedAt != entityB.UpdatedAt {
+		t.Errorf("wallet.UpdatedAt is %v, expected %v", entityA.UpdatedAt, entityB.UpdatedAt)
+	}
+	if entityA.DeletedAt != entityB.DeletedAt {
+		t.Errorf("wallet.DeletedAt is %v, expected %v", entityA.DeletedAt, entityB.DeletedAt)
+	}
+}
+
+func TestWalletUCGetWallet_WalletExists_ReturnsWallet(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	userID := domain.UserID(99)
+	expectedEnt := GetTestWalletEntityWithDeletedAt()
+	mockRepo := mocks.NewMockWalletRepoI(mockCtrl)
 
-	userRepo := mocks.NewMockUserRepo(mockCtrl)
+	mockRepo.EXPECT().
+		GetByUserID(expectedEnt.UserID).
+		Return(&expectedEnt, nil)
 
-	preInsertedUser := domain.User{ID: userID}
-	insertedUser := domain.User{ID: userID}
+	uc := usecases.NewUseCases(&infra.Repositories{WalletRepo: mockRepo}).GetWalletUC()
 
-	userRepo.EXPECT().
-		GetByID(userID).
-		Return(domain.User{}, false)
-
-	userRepo.EXPECT().
-		Insert(preInsertedUser).
-		Return(insertedUser)
-
-	walletID := domain.WalletID(1234)
-	balance := domain.NewCurrencyFromString("0.0")
-	preInsertedWallet := domain.Wallet{
-		UserID:  userID,
-		Balance: balance,
+	entity, created, userCreated, err := uc.GetWallet(expectedEnt.UserID)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	insertedWallet := domain.Wallet{
-		ID:      walletID,
-		Balance: balance,
-		UserID:  userID,
-	}
-	walletRepo := mocks.NewMockWalletRepo(mockCtrl)
-	walletRepo.EXPECT().
-		GetByUserID(userID).
-		Return(domain.Wallet{}, false)
+	CheckWalletsAreEquals(t, *entity, expectedEnt)
 
-	walletRepo.EXPECT().
-		Insert(preInsertedWallet).
-		Return(insertedWallet)
-
-	useCases := NewUseCases(&infra.Repositories{UserRepo: userRepo, WalletRepo: walletRepo})
-
-	walletUC := useCases.GetWalletUC()
-	wallet := walletUC.GetWallet(userID)
-	if wallet.ID != walletID {
-		t.Errorf("wallet ID is %v, expected %v", wallet.ID, walletID)
+	if created {
+		t.Errorf("the wallet was created, expected as not created")
 	}
-	if wallet.UserID != userID {
-		t.Errorf("wallet user ID is %v, expected %v", wallet.UserID, userID)
+	if userCreated {
+		t.Errorf("the user was created, expected as not created")
 	}
-	if !wallet.Balance.IsZero() {
-		t.Errorf("wallet balance %v, expected zero", wallet.Balance)
+}
+func TestWalletUCGetWallet_WalletDoesNotExists_WalletCreated(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	expectedEnt := GetTestWalletEntity()
+	expectedEnt.Balance = domain.NewMoneyFromString("0.0")
+	expectedUserEnt := GetTestUserEntity()
+
+	mockRepo := mocks.NewMockWalletRepoI(mockCtrl)
+	mockUserRepo := mocks.NewMockUserRepoI(mockCtrl)
+
+	mockRepo.EXPECT().
+		GetByUserID(expectedEnt.UserID).
+		Return(nil, nil)
+
+	mockUserRepo.EXPECT().
+		GetByID(expectedUserEnt.ID).
+		Return(&expectedUserEnt, nil)
+
+	preInsertEnt := domain.Wallet{
+		UserID:  expectedEnt.UserID,
+		Balance: domain.NewMoneyFromString("0.0"),
+	}
+	mockRepo.EXPECT().
+		Insert(preInsertEnt).
+		Return(&expectedEnt, nil)
+
+	uc := usecases.NewUseCases(&infra.Repositories{UserRepo: mockUserRepo, WalletRepo: mockRepo}).GetWalletUC()
+
+	entity, created, _, err := uc.GetWallet(expectedEnt.UserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	CheckWalletsAreEquals(t, *entity, expectedEnt)
+
+	if !created {
+		t.Errorf("the wallet not created, expected as created")
+	}
+}
+
+func TestWalletUCGetWallet_BetweenGetByUserIDAndInsertCalls_ReturnsWallet(t *testing.T) {
+	// This test the event of a wallet inserted between the GetByUserID and Insert calls.
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	expectedEnt := GetTestWalletEntity()
+	expectedEnt.Balance = domain.NewMoneyFromString("0.0")
+	expectedUserEnt := GetTestUserEntity()
+
+	mockRepo := mocks.NewMockWalletRepoI(mockCtrl)
+	mockUserRepo := mocks.NewMockUserRepoI(mockCtrl)
+
+	mockRepo.EXPECT().
+		GetByUserID(expectedEnt.UserID).
+		Return(nil, nil)
+
+	mockUserRepo.EXPECT().
+		GetByID(expectedUserEnt.ID).
+		Return(&expectedUserEnt, nil)
+
+	preInsertEnt := domain.Wallet{
+		UserID:  expectedEnt.UserID,
+		Balance: domain.NewMoneyFromString("0.0"),
+	}
+	mockRepo.EXPECT().
+		Insert(preInsertEnt).
+		Return(nil, fmt.Errorf("%w: User ID %d", infra.ErrWalletAlreadyExists, expectedEnt.UserID))
+
+	mockRepo.EXPECT().
+		GetByUserID(expectedEnt.UserID).
+		Return(&expectedEnt, nil)
+
+	uc := usecases.NewUseCases(&infra.Repositories{UserRepo: mockUserRepo, WalletRepo: mockRepo}).GetWalletUC()
+
+	entity, created, _, err := uc.GetWallet(expectedEnt.UserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	CheckWalletsAreEquals(t, *entity, expectedEnt)
+
+	if created {
+		t.Errorf("the wallet created, expected as not created")
 	}
 }

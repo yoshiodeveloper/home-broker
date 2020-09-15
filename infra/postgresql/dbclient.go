@@ -41,7 +41,16 @@ func (dbClient *DBClient) SetDB(db *gorm.DB) {
 func (dbClient *DBClient) Open() error {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		dbClient.Host, dbClient.Port, dbClient.User, dbClient.Password, dbClient.DBName, dbClient.SSLMode)
-	// Only an integration test could test this point.
+	/*
+		newLogger := logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+			logger.Config{
+				SlowThreshold: time.Second, // Slow SQL threshold
+				LogLevel:      logger.Info, // Log level
+				Colorful:      false,       // Disable color
+			},
+		)
+	*/
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	dbClient.SetDB(db)
 	return err

@@ -3,6 +3,7 @@ module home-broker
 go 1.15
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/golang/mock v1.4.4
 	github.com/shopspring/decimal v1.2.0
 	gorm.io/driver/postgres v1.0.0

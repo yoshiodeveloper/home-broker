@@ -1,5 +1,4 @@
 package usecases
 
-// UseCase is an interface for an use case.
-type UseCase interface {
-}
+// UseCaseI is an interface for an use case.
+type UseCaseI interface{}

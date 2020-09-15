@@ -3,7 +3,7 @@ package usecases
 import "home-broker/infra"
 
 // UseCases holds all use cases.
-// Use cases know the business logics.
+// Use cases know the business logic.
 // They also know when they should interact with services (ex. databases).
 // That's why they need to receive the Repositories using dependency injection.
 type UseCases struct {
