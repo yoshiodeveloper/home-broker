@@ -67,6 +67,7 @@ func (uc *WalletUC) GetWallet(userID domain.UserID) (entity *domain.Wallet, crea
 }
 
 // IncBalance increments or decrements the wallet funds (balance).
+// The retuned entity can be nil if the user or wallet does not exist.
 func (uc *WalletUC) IncBalance(userID domain.UserID, amount domain.Money) (entity *domain.Wallet, err error) {
 	repo := uc.repos.WalletRepo
 	entity, err = repo.IncBalanceByUserID(userID, amount)

@@ -60,6 +60,7 @@ func (repo *UserRepo) ToEntity(modelGORM *UserGORM) (entity domain.User) {
 }
 
 // GetByID returns an user from the database by ID.
+// A nil entity will be returned if it does not exist.
 func (repo *UserRepo) GetByID(id domain.UserID) (*domain.User, error) {
 	modelGORM := UserGORM{}
 	res := repo.dbClient.db.Take(&modelGORM, int64(id))
@@ -74,6 +75,8 @@ func (repo *UserRepo) GetByID(id domain.UserID) (*domain.User, error) {
 }
 
 // Insert inserts a new user.
+// A nil entity will be returned if an error occurs.
+// The following errors can happen: ErrWalletAlreadyExists.
 func (repo *UserRepo) Insert(entity domain.User) (*domain.User, error) {
 	modelGORM := UserGORM{ID: int64(entity.ID)}
 	res := repo.dbClient.db.Create(&modelGORM)

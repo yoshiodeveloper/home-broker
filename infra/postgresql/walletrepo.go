@@ -80,6 +80,7 @@ func (repo *WalletRepo) ToGORMModel(entity *domain.Wallet) WalletGORM {
 }
 
 // GetByUserID returns a wallet from the database by an user ID.
+// A nil entity will be returned if it does not exist.
 func (repo *WalletRepo) GetByUserID(userID domain.UserID) (*domain.Wallet, error) {
 	modelGORM := WalletGORM{}
 	modelGORMCond := WalletGORM{UserID: int64(userID)}
@@ -95,6 +96,8 @@ func (repo *WalletRepo) GetByUserID(userID domain.UserID) (*domain.Wallet, error
 }
 
 // Insert inserts a new wallet.
+// A nil entity will be returned if an error occurs.
+// The following errors can happen: ErrWalletAlreadyExists, ErrUserDoesNotExist.
 func (repo *WalletRepo) Insert(entity domain.Wallet) (*domain.Wallet, error) {
 	modelGORM := repo.ToGORMModel(&entity)
 	res := repo.dbClient.db.Create(&modelGORM)
@@ -119,6 +122,7 @@ func (repo *WalletRepo) Insert(entity domain.Wallet) (*domain.Wallet, error) {
 }
 
 // IncBalanceByUserID increments or decrements the balance field by a user ID.
+// An updated entity entity will be returned or nil if it does not exist.
 func (repo *WalletRepo) IncBalanceByUserID(userID domain.UserID, amount domain.Money) (*domain.Wallet, error) {
 	updatedAt := time.Now()
 	res := repo.dbClient.db.
@@ -128,7 +132,6 @@ func (repo *WalletRepo) IncBalanceByUserID(userID domain.UserID, amount domain.M
 			"balance":    gorm.Expr(`"balance"+?`, amount.Number),
 			"updated_at": updatedAt,
 		})
-
 	if res.Error != nil {
 		return nil, res.Error
 	}
