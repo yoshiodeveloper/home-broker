@@ -32,7 +32,7 @@ func GetTestWalletEntity() domain.Wallet {
 	return domain.Wallet{
 		ID:        domain.WalletID(9999),
 		UserID:    user.ID,
-		Balance:   domain.NewMoneyFromString("999999999.999999"),
+		Balance:   domain.NewMoneyFromFloatString("999999999.999999"),
 		CreatedAt: walletBaseTime,
 		UpdatedAt: walletBaseTime.Add(time.Hour * 2),
 		DeletedAt: time.Time{},
@@ -50,7 +50,7 @@ func GetTestWalletGORM() postgresql.WalletGORM {
 	return postgresql.WalletGORM{
 		ID:        int64(entity.ID),
 		UserID:    int64(entity.UserID),
-		Balance:   entity.Balance.Number,
+		Balance:   entity.Balance,
 		CreatedAt: entity.CreatedAt,
 		UpdatedAt: entity.UpdatedAt,
 		DeletedAt: gorm.DeletedAt{Time: time.Time{}, Valid: false},
@@ -71,7 +71,7 @@ func CheckWalletsAreEquals(t *testing.T, entityA domain.Wallet, entityB domain.W
 	if entityA.UserID != entityB.UserID {
 		t.Errorf("wallet.UserID is %v, expected %v", entityA.UserID, entityB.UserID)
 	}
-	if !entityA.Balance.Equal(entityB.Balance) {
+	if entityA.Balance != entityB.Balance {
 		t.Errorf("wallet.Balance is %v, expected %v", entityA.Balance, entityB.Balance)
 	}
 	if entityA.CreatedAt != entityB.CreatedAt {
@@ -92,8 +92,8 @@ func CheckWalletGORMEntityAreEquals(t *testing.T, modelGORM postgresql.WalletGOR
 	if modelGORM.UserID != int64(entity.UserID) {
 		t.Errorf("modelGORM.UserID is %v, expected %v", modelGORM.UserID, int64(entity.UserID))
 	}
-	if !entity.Balance.Number.Equal(modelGORM.Balance) {
-		t.Errorf("modelGORM.Balance is %v, expected %v", modelGORM.Balance, entity.Balance.Number)
+	if entity.Balance != modelGORM.Balance {
+		t.Errorf("modelGORM.Balance is %v, expected %v", modelGORM.Balance, entity.Balance)
 	}
 	if modelGORM.CreatedAt != entity.CreatedAt {
 		t.Errorf("modelGORM.CreatedAt is %v, expected %v", modelGORM.CreatedAt, entity.CreatedAt)
@@ -113,8 +113,8 @@ func CheckWalletEntityGORMAreEquals(t *testing.T, entity domain.Wallet, modelGOR
 	if int64(entity.UserID) != modelGORM.UserID {
 		t.Errorf("wallet.UserID is %v, expected %v", int64(entity.UserID), modelGORM.UserID)
 	}
-	if !entity.Balance.Number.Equal(modelGORM.Balance) {
-		t.Errorf("wallet.Balance is %v, expected %v", entity.Balance.Number, modelGORM.Balance)
+	if entity.Balance != modelGORM.Balance {
+		t.Errorf("wallet.Balance is %v, expected %v", entity.Balance, modelGORM.Balance)
 	}
 	if entity.CreatedAt != modelGORM.CreatedAt {
 		t.Errorf("user.CreatedAt is %v, expected %v", entity.CreatedAt, modelGORM.CreatedAt)
@@ -154,7 +154,7 @@ func TestWalletRepoToGORMModel(t *testing.T) {
 func TestWalletRepoToGORMModel_DeletedAtFieldIsNull_WalletDeletedAtIsZero(t *testing.T) {
 	repo := GetTestWalletRepo()
 	entity := GetTestWalletEntity()
-	entity.Balance = domain.NewMoneyFromString("999999999.999999")
+	entity.Balance = domain.NewMoneyFromFloatString("999999999.999999")
 	modelGORM := repo.ToGORMModel(&entity)
 	CheckWalletGORMEntityAreEquals(t, modelGORM, entity)
 }
@@ -182,7 +182,7 @@ func TestWalletRepoGetByUserID_WalletWithUserIDExists_WalletReturned(t *testing.
 		WithArgs(int64(expectedEntity.UserID)).
 		WillReturnRows(mock.NewRows(columns).
 			AddRow(
-				int64(expectedEntity.ID), int64(expectedEntity.UserID), expectedEntity.Balance.String(),
+				int64(expectedEntity.ID), int64(expectedEntity.UserID), expectedEntity.Balance,
 				expectedEntity.CreatedAt, expectedEntity.UpdatedAt, nil))
 	entity, err := repo.GetByUserID(expectedEntity.UserID)
 	if err != nil {
@@ -204,7 +204,7 @@ func TestWalletRepoInsert_UserExists_NewWalletInserted(t *testing.T) {
 			sqlmock.AnyArg(),
 			nil,
 			int64(expectedEntity.UserID),
-			expectedEntity.Balance.Number,
+			expectedEntity.Balance,
 		).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(expectedEntity.ID)))
 
 	entity := GetTestWalletEntity()
@@ -228,7 +228,7 @@ func TestWalletRepoInsert_WalletIDExists_WalletIDAlreadyExistsError(t *testing.T
 			sqlmock.AnyArg(),
 			nil,
 			int64(expectedEntity.UserID),
-			expectedEntity.Balance.Number,
+			expectedEntity.Balance,
 			int64(expectedEntity.ID),
 		).WillReturnError(errors.New(`ERROR: duplicate key value violates unique constraint "wallet_pkey" (SQLSTATE 23505)`))
 	mock.ExpectRollback()
@@ -260,7 +260,7 @@ func TestWalletRepoInsert_WalletUserIDExists_WalletUserIDAlreadyExistsError(t *t
 			sqlmock.AnyArg(),
 			nil,
 			int64(expectedEntity.UserID),
-			expectedEntity.Balance.Number,
+			expectedEntity.Balance,
 		).WillReturnError(errors.New(`ERROR: duplicate key value violates unique constraint "wallet_user_id_key" (SQLSTATE 23505)`))
 	mock.ExpectRollback()
 
@@ -291,7 +291,7 @@ func TestWalletRepoInsert_WalletUserIDDoesNotExist_UserDoesNotExistError(t *test
 			sqlmock.AnyArg(),
 			nil,
 			int64(expectedEntity.UserID),
-			expectedEntity.Balance.Number,
+			expectedEntity.Balance,
 			int64(expectedEntity.ID),
 		).WillReturnError(errors.New(`ERROR: insert or update on table "wallet" violates foreign key constraint "fk_wallet_user" (SQLSTATE 23503)`))
 	mock.ExpectRollback()
@@ -315,13 +315,13 @@ func TestWalletRepoIncBalanceByUserID(t *testing.T) {
 	repo, mock := GetMockedWalletRepo()
 	expectedEnt := GetTestWalletEntity()
 
-	addFunds := domain.NewMoneyFromString("999.999999")
-	balance := domain.NewMoneyFromString("1000.999999")
-	expectedEnt.Balance = balance.Add(addFunds)
+	value := domain.NewMoneyFromFloatString("999.999999")
+	balance := domain.NewMoneyFromFloatString("1000.999999")
+	expectedEnt.Balance += balance
 
 	mock.ExpectExec(`UPDATE "wallet" SET .+ WHERE.+"user_id"\s*=\s*\$3`).
 		WithArgs(
-			addFunds.Number,
+			value,
 			sqlmock.AnyArg(),
 			int64(expectedEnt.UserID),
 		).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -332,10 +332,10 @@ func TestWalletRepoIncBalanceByUserID(t *testing.T) {
 		WithArgs(int64(expectedEnt.UserID)).
 		WillReturnRows(mock.NewRows(columns).
 			AddRow(
-				int64(expectedEnt.ID), int64(expectedEnt.UserID), expectedEnt.Balance.String(),
+				int64(expectedEnt.ID), int64(expectedEnt.UserID), expectedEnt.Balance,
 				expectedEnt.CreatedAt, expectedEnt.UpdatedAt, nil))
 
-	entity, err := repo.IncBalanceByUserID(expectedEnt.UserID, addFunds)
+	entity, err := repo.IncBalanceByUserID(expectedEnt.UserID, value)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,13 +346,13 @@ func TestWalletRepoIncBalanceByUserID_WalletDoesNotExist_NoWalletReturned(t *tes
 	repo, mock := GetMockedWalletRepo()
 	expectedEnt := GetTestWalletEntity()
 
-	addFunds := domain.NewMoneyFromString("999.999999")
-	balance := domain.NewMoneyFromString("1000.999999")
-	expectedEnt.Balance = balance.Add(addFunds)
+	value := domain.NewMoneyFromFloatString("999.999999")
+	balance := domain.NewMoneyFromFloatString("1000.999999")
+	expectedEnt.Balance += balance
 
 	mock.ExpectExec(`UPDATE "wallet" SET .+ WHERE.+"user_id"\s*=\s*\$3`).
 		WithArgs(
-			addFunds.Number,
+			value,
 			sqlmock.AnyArg(),
 			int64(expectedEnt.UserID),
 		).WillReturnResult(sqlmock.NewResult(0, 0))
@@ -363,7 +363,7 @@ func TestWalletRepoIncBalanceByUserID_WalletDoesNotExist_NoWalletReturned(t *tes
 		WithArgs(int64(expectedEnt.UserID)).
 		WillReturnRows(mock.NewRows(columns))
 
-	entity, err := repo.IncBalanceByUserID(expectedEnt.UserID, addFunds)
+	entity, err := repo.IncBalanceByUserID(expectedEnt.UserID, value)
 	if err != nil {
 		t.Fatal(err)
 	}

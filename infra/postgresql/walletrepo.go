@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -18,10 +17,10 @@ type WalletGORM struct {
 	ID        int64 `gorm:"primaryKey;autoIncrement:true"`
 	UserID    int64 `gorm:"unique;not null"`
 	User      UserGORM
-	Balance   decimal.Decimal `gorm:"not null;type:NUMERIC(21,6);index:,sort:desc"` // Mind the domain.MoneyDecimalPlaces.
-	CreatedAt time.Time       `gorm:"not null;index:,sort:desc"`
-	UpdatedAt time.Time       `gorm:"not null;index:,sort:desc"`
-	DeletedAt gorm.DeletedAt  `gorm:"index:,sort:desc"`
+	Balance   domain.Money   `gorm:"not null;index:,sort:desc"` // Mind the domain.MoneyDecimalPlaces.
+	CreatedAt time.Time      `gorm:"not null;index:,sort:desc"`
+	UpdatedAt time.Time      `gorm:"not null;index:,sort:desc"`
+	DeletedAt gorm.DeletedAt `gorm:"index:,sort:desc"`
 }
 
 // TableName returns the real table name of Wallet.
@@ -54,7 +53,7 @@ func (repo *WalletRepo) ToEntity(modelGORM *WalletGORM) domain.Wallet {
 	entity := domain.Wallet{
 		ID:        domain.WalletID(modelGORM.ID),
 		UserID:    domain.UserID(modelGORM.UserID),
-		Balance:   domain.Money{Number: modelGORM.Balance},
+		Balance:   modelGORM.Balance,
 		CreatedAt: modelGORM.CreatedAt,
 		UpdatedAt: modelGORM.UpdatedAt,
 		DeletedAt: deletedAt,
@@ -71,7 +70,7 @@ func (repo *WalletRepo) ToGORMModel(entity *domain.Wallet) WalletGORM {
 	model := WalletGORM{
 		ID:        int64(entity.ID),
 		UserID:    int64(entity.UserID),
-		Balance:   entity.Balance.Number,
+		Balance:   entity.Balance,
 		CreatedAt: entity.CreatedAt,
 		UpdatedAt: entity.UpdatedAt,
 		DeletedAt: deletedAt,
@@ -129,7 +128,7 @@ func (repo *WalletRepo) IncBalanceByUserID(userID domain.UserID, amount domain.M
 		Table("wallet").
 		Where(`"user_id"=? AND "deleted_at" IS NULL`, int64(userID)).
 		Updates(map[string]interface{}{
-			"balance":    gorm.Expr(`"balance"+?`, amount.Number),
+			"balance":    gorm.Expr(`"balance"+?`, amount),
 			"updated_at": updatedAt,
 		})
 	if res.Error != nil {

@@ -12,7 +12,7 @@ type UserUC struct {
 	repos *infra.Repositories
 }
 
-// NewUserUC returns a new WalletUseCase.
+// NewUserUC returns a new UserUC.
 func NewUserUC(repos *infra.Repositories) *UserUC {
 	return &UserUC{repos: repos}
 }

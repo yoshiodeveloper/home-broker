@@ -48,7 +48,7 @@ func (uc *WalletUC) GetWallet(userID domain.UserID) (entity *domain.Wallet, crea
 
 	newWallet := domain.Wallet{
 		UserID:  userID,
-		Balance: domain.NewMoneyFromString("0.0"),
+		Balance: domain.NewMoneyFromFloatString("0.0"),
 	}
 	entity, err = repo.Insert(newWallet)
 	if err == nil {
