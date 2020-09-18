@@ -1,8 +1,9 @@
 package domain_test
 
 import (
+	"fmt"
 	"home-broker/domain"
-	"reflect"
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -21,147 +22,159 @@ func GetTestAsset() domain.Asset {
 	}
 }
 
-func GetTestOrder(id domain.OrderID, externalOrderID string, amount int64, price domain.Money, Type string, exTimestamp time.Time) domain.Order {
+func GetTestOrder(id int64, orderType domain.OrderType, price domain.Money, amount int64, exTimestamp time.Time) domain.Order {
 	asset := GetTestAsset()
-	return domain.Order{
-		ID:                id,
-		ExternalOrderID:   externalOrderID,
-		UserID:            999,
-		AssetID:           asset.ID,
-		Amount:            amount,
-		Price:             price,
-		Type:              Type,
-		ExternalTimestamp: exTimestamp,
-		CreatedAt:         exTimestamp,
-		UpdatedAt:         exTimestamp.Add(time.Hour * 2),
-		DeletedAt:         time.Time{},
+	var o domain.Order
+	if orderType == domain.OrderTypeBuy {
+		o = domain.NewBuyOrder(asset.ID, amount, price)
+	} else {
+		o = domain.NewSellOrder(asset.ID, amount, price)
 	}
-}
-
-func TestOrderAddOrder_AddBuyOrderOnEmptyPool_BuyOrderAdded(t *testing.T) {
-	oType := domain.OrderTypeBuy
-	order := GetTestOrder(999999, "ex999999", 99, domain.NewMoneyFromFloatString("99.9999999"), oType, baseTime)
-	ob := domain.NewOrderBook(order.AssetID)
-	if ob.BuyOrdersHead != nil {
-		t.Errorf("BuyOrdersHead is not nil, expected a nil")
-	}
-	ob.AddOrder(&order)
-	if ob.BuyOrdersHead == nil {
-		t.Errorf("BuyOrdersHead is nil, expected as not nil")
-	}
-	if ob.BuyOrdersHead.Left != nil {
-		t.Errorf("BuyOrdersHead.Left is not nil, expected as nil")
-	}
-	if ob.BuyOrdersHead.Right != nil {
-		t.Errorf("BuyOrdersHead.Right is not nil, expected as nil")
-	}
-	if ob.BuyOrdersHead.Price != order.Price {
-		t.Errorf("BuyOrdersHead.Price is %v, expected %v", ob.BuyOrdersHead.Price, order.Price)
-	}
-	if ob.BuyOrdersHead.AmountSum != order.Amount {
-		t.Errorf("BuyOrdersHead.AmountSum is %v, expected %v", ob.BuyOrdersHead.AmountSum, order.Amount)
-	}
-	if ob.BuyOrdersHead.OrdersCount != 1 {
-		t.Errorf("BuyOrdersHead.OrdersCount is %v, expected 1", ob.BuyOrdersHead.OrdersCount)
-	}
-
-	if ob.BuyOrdersHead.OrderHead == nil {
-		t.Errorf("BuyOrdersHead.OrderHead is nil, expected not nil")
-	}
-	if ob.BuyOrdersHead.OrderHead.Left != nil {
-		t.Errorf("BuyOrdersHead.OrderHead.Left is not nil, expected as nil")
-	}
-	if ob.BuyOrdersHead.OrderHead.Right != nil {
-		t.Errorf("BuyOrdersHead.OrderHead.Right is not nil, expected as nil")
-	}
-	if !reflect.DeepEqual(ob.BuyOrdersHead.OrderHead.Order, order) {
-		t.Errorf("ob.BuyOrdersHead.OrderHead.Order is different from order: %v != %v", ob.BuyOrdersHead.OrderHead.Order, order)
-	}
-}
-
-func TestOrderAddOrder_AddSellOrderOnEmptyPool_SellOrderAdded(t *testing.T) {
-	oType := domain.OrderTypeSell
-	order := GetTestOrder(999999, "ex999999", 99, domain.NewMoneyFromFloatString("99.9999999"), oType, baseTime)
-	ob := domain.NewOrderBook(order.AssetID)
-	if ob.SellOrdersHead != nil {
-		t.Errorf("SellOrdersHead is not nil, expected a nil")
-	}
-	ob.AddOrder(&order)
-	if ob.SellOrdersHead == nil {
-		t.Errorf("SellOrdersHead is nil, expected as not nil")
-	}
-	if ob.SellOrdersHead.Left != nil {
-		t.Errorf("SellOrdersHead.Left is not nil, expected as nil")
-	}
-	if ob.SellOrdersHead.Right != nil {
-		t.Errorf("SellOrdersHead.Right is not nil, expected as nil")
-	}
-	if ob.SellOrdersHead.Price != order.Price {
-		t.Errorf("SellOrdersHead.Price is %v, expected %v", ob.SellOrdersHead.Price, order.Price)
-	}
-	if ob.SellOrdersHead.AmountSum != order.Amount {
-		t.Errorf("SellOrdersHead.AmountSum is %v, expected %v", ob.SellOrdersHead.AmountSum, order.Amount)
-	}
-	if ob.SellOrdersHead.OrdersCount != 1 {
-		t.Errorf("SellOrdersHead.OrdersCount is %v, expected 1", ob.SellOrdersHead.OrdersCount)
-	}
-
-	if ob.SellOrdersHead.OrderHead == nil {
-		t.Errorf("SellOrdersHead.OrderHead is nil, expected not nil")
-	}
-	if ob.SellOrdersHead.OrderHead.Left != nil {
-		t.Errorf("SellOrdersHead.OrderHead.Left is not nil, expected as nil")
-	}
-	if ob.SellOrdersHead.OrderHead.Right != nil {
-		t.Errorf("SellOrdersHead.OrderHead.Right is not nil, expected as nil")
-	}
-	if !reflect.DeepEqual(ob.SellOrdersHead.OrderHead.Order, order) {
-		t.Errorf("ob.SellOrdersHead.OrderHead.Order is different from order: %v != %v", ob.SellOrdersHead.OrderHead.Order, order)
-	}
+	o.ID = domain.OrderID(id)
+	o.ExternalID = domain.ExternalOrderID(fmt.Sprintf("ex%d", id))
+	o.ExternalTimestamp = exTimestamp
+	o.CreatedAt = exTimestamp
+	o.UpdatedAt = exTimestamp.Add(time.Hour * 2)
+	o.DeletedAt = time.Time{}
+	o.UserID = 999
+	return o
 }
 
 func TestOrderAddOrder_AddManyBuyOrders_BuyOrdersAddedSorted(t *testing.T) {
-	oType := domain.OrderTypeBuy
-	expectedOrder := []domain.Order{
-		GetTestOrder(1, "ex1", 91, domain.NewMoneyFromFloatString("99.000005"), oType, baseTime), // < -- best bid
-		GetTestOrder(2, "ex2", 97, domain.NewMoneyFromFloatString("99.000004"), oType, baseTime),
-		GetTestOrder(3, "ex3", 93, domain.NewMoneyFromFloatString("99.000004"), oType, baseTime.Add(time.Millisecond)),
-		GetTestOrder(4, "ex4", 95, domain.NewMoneyFromFloatString("99.000003"), oType, baseTime),
-		GetTestOrder(5, "ex5", 95, domain.NewMoneyFromFloatString("99.000003"), oType, baseTime.Add(time.Millisecond)),
-		GetTestOrder(6, "ex6", 98, domain.NewMoneyFromFloatString("99.000002"), oType, baseTime),
-		GetTestOrder(7, "ex7", 96, domain.NewMoneyFromFloatString("99.000001"), oType, baseTime), // <-- worst bid
-	}
+	tests := 1000
+	expectedOrders := make([]domain.Order, 0)
+	insertionOrders := make([]domain.Order, 0)
+	exTime := baseTime
 
-	// Must be ordered by price and time.
-	insertionOrder := []domain.Order{
-		expectedOrder[5],
-		expectedOrder[2],
-		expectedOrder[6],
-		expectedOrder[4],
-		expectedOrder[0],
-		expectedOrder[3],
-		expectedOrder[1],
-	}
-	// GetTestOrder(6, "ex6", 97, domain.NewMoneyFromFloatString("99.000004"), oType, baseTime)
-	// GetTestOrder(3, "ex3", 95, domain.NewMoneyFromFloatString("99.000003"), oType, baseTime.Add(time.Millisecond))
-	// --
-	// GetTestOrder(3, "ex3", 95, domain.NewMoneyFromFloatString("99.000003"), oType, baseTime.Add(time.Millisecond))
-	// GetTestOrder(7, "ex7", 91, domain.NewMoneyFromFloatString("99.000005"), oType, baseTime)
-	// GetTestOrder(6, "ex6", 97, domain.NewMoneyFromFloatString("99.000004"), oType, baseTime)
-
-	ob := domain.NewOrderBook(expectedOrder[0].AssetID)
-
-	for _, order := range insertionOrder {
-		ob.AddOrder(&order)
-	}
-
-	if len(ob.GetBuyingOrders()) != len(expectedOrder) {
-		t.Errorf("BuyOrders does not has %d itens: %v", len(expectedOrder), len(ob.GetBuyingOrders()))
-	}
-	for i, order := range expectedOrder {
-		t.Logf("verifying item in index %v", i)
-		if !reflect.DeepEqual(ob.GetBuyingOrders()[i], order) {
-			t.Errorf("ob.BuyOrdersHead.OrderHead.Order[%v] is different from order: %v != %v", i, ob.GetBuyingOrders()[i], order)
+	// This creates a list of offers in the expected order.
+	// Each price level will have 10 orders with the same price but different time.
+	price := domain.Money(tests)
+	for i := tests - 1; i >= 0; i-- {
+		if i%5 == 0 {
+			// Creates 10 equals prices (same price level).
+			price -= domain.Money(1) // decrementing
 		}
+		order := GetTestOrder(int64(i+1), domain.OrderTypeBuy, price, int64(i+1), exTime)
+		expectedOrders = append(expectedOrders, order)
+		insertionOrders = append(insertionOrders, order)
+		if i%2 == 0 {
+			// The time is the same every even.
+			exTime = exTime.Add(time.Nanosecond)
+		}
+	}
+
+	t.Logf("%d order(s) was created for the test", len(expectedOrders))
+
+	rand.Seed(1) // Shuffes always in the same order.
+	rand.Shuffle(len(insertionOrders), func(i, j int) {
+		insertionOrders[i], insertionOrders[j] = insertionOrders[j], insertionOrders[i]
+	})
+
+	ob := domain.NewOrderBook(expectedOrders[0].AssetID)
+	for i, order := range insertionOrders {
+		if order.Price == 0 {
+			t.Errorf("insertionOrders[%d] has no Price: %v", i, order)
+		}
+		if order.Type == "" {
+			t.Errorf("insertionOrders[%d] has no Type: %v", i, order)
+		}
+		ob.AddOrder(order)
+	}
+
+	orders := ob.GetBuyOrders()
+	if len(orders) != len(expectedOrders) {
+		t.Errorf("orders has %d itens, expected %d", len(orders), len(expectedOrders))
+	}
+
+	for i, expectedOrder := range expectedOrders {
+		order := orders[i]
+		// We shouldn't compare IDs because when the price and timestamp are the
+		// same the items don't have a specific order.
+		if order.Price != expectedOrder.Price {
+			t.Errorf("order[%d].Price is %v, expected %v", i, order.Price, expectedOrder.Price)
+		}
+		if order.ExternalTimestamp != expectedOrder.ExternalTimestamp {
+			t.Errorf("order[%d].ExternalTimestamp is %v, expected %v", i, order.ExternalTimestamp, expectedOrder.ExternalTimestamp)
+		}
+	}
+}
+
+func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
+	tests := 1000
+	expectedOrders := make([]domain.Order, 0)
+	insertionOrders := make([]domain.Order, 0)
+	exTime := baseTime
+
+	// This creates a list of offers in the expected order.
+	// Each price level will have 10 orders with the same price but different time.
+	price := domain.Money(0)
+	for i := 0; i < tests; i++ {
+		if i%5 == 0 {
+			// Creates 10 equals prices (same price level).
+			price += domain.Money(1) // incrementing
+		}
+		order := GetTestOrder(int64(i+1), domain.OrderTypeSell, price, int64(i+1), exTime)
+		expectedOrders = append(expectedOrders, order)
+		insertionOrders = append(insertionOrders, order)
+		if i%2 == 0 {
+			// The time is the same every even.
+			exTime = exTime.Add(time.Nanosecond)
+		}
+	}
+
+	t.Logf("%d order(s) was created for the test", len(expectedOrders))
+
+	rand.Seed(1) // Shuffes always in the same order.
+	rand.Shuffle(len(insertionOrders), func(i, j int) {
+		insertionOrders[i], insertionOrders[j] = insertionOrders[j], insertionOrders[i]
+	})
+
+	ob := domain.NewOrderBook(expectedOrders[0].AssetID)
+	for i, order := range insertionOrders {
+		if order.Price == 0 {
+			t.Errorf("insertionOrders[%d] has no Price: %v", i, order)
+		}
+		if order.Type == "" {
+			t.Errorf("insertionOrders[%d] has no Type: %v", i, order)
+		}
+		ob.AddOrder(order)
+	}
+
+	orders := ob.GetSellOrders()
+	if len(orders) != len(expectedOrders) {
+		t.Errorf("orders has %d itens, expected %d", len(orders), len(expectedOrders))
+	}
+
+	for i, expectedOrder := range expectedOrders {
+		order := orders[i]
+		// We shouldn't compare IDs because when the price and timestamp are the
+		// same the items don't have a specific order.
+		if order.Price != expectedOrder.Price {
+			t.Errorf("order[%d].Price is %v, expected %v", i, order.Price, expectedOrder.Price)
+		}
+		if order.ExternalTimestamp != expectedOrder.ExternalTimestamp {
+			t.Errorf("order[%d].ExternalTimestamp is %v, expected %v", i, order.ExternalTimestamp, expectedOrder.ExternalTimestamp)
+		}
+	}
+}
+
+func BenchmarkOderBookInsertion(b *testing.B) {
+	asset := GetTestAsset()
+	ob := domain.NewOrderBook(asset.ID)
+	var orderType domain.OrderType
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if i%2 == 0 {
+			orderType = domain.OrderTypeBuy
+		} else {
+			orderType = domain.OrderTypeSell
+		}
+		orderID := rand.Int63() + 1
+		amount := rand.Int63n(10000) + 1
+		exTime := time.Now()
+		// 10k price levels (ex: $0.01 ~ $100.01)
+		price := domain.Money(rand.Int63n(10000) + 1)
+		order := GetTestOrder(orderID, orderType, price, amount, exTime)
+		ob.AddOrder(order)
 	}
 }

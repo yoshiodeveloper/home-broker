@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestWalletNewMoneyFromFloatString(t *testing.T) {
+func TestNewMoneyFromFloatString(t *testing.T) {
 	testTable := []struct {
 		test     string
 		expected domain.Money
@@ -23,9 +23,22 @@ func TestWalletNewMoneyFromFloatString(t *testing.T) {
 		{test: "999999999999.999999999", expected: 999999999999999999},
 	}
 	for i, table := range testTable {
-		v := domain.NewMoneyFromFloatString(table.test)
+		v, err := domain.NewMoneyFromFloatString(table.test)
+		if err != nil {
+			t.Errorf("result[%v] returned an error: %v", i, err)
+		}
 		if v != table.expected {
 			t.Errorf("result[%v] is %v, expected %v", i, v, table.expected)
+		}
+	}
+}
+
+func TestNewMoneyFromFloatString_InvalidStrings(t *testing.T) {
+	testTable := []string{"a", ".", ",", "9,9"}
+	for i, vStr := range testTable {
+		_, err := domain.NewMoneyFromFloatString(vStr)
+		if err == nil {
+			t.Errorf("result[%v] did not returned an error: %v", i, err)
 		}
 	}
 }
