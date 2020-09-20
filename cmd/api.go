@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"fmt"
+	"home-broker/config"
 	"home-broker/core/implem/postgresql"
 	"log"
+
+	"github.com/spf13/viper"
 
 	coregin "home-broker/core/implem/gin"
 
@@ -38,10 +42,14 @@ func init() {
 }
 
 func runAPIServer(cmd *cobra.Command, args []string) {
-	mainDB := postgresql.NewDB("localhost", 5432, "homebroker", "123456", "homebroker")
+	// appConfig := config.NewAppConfigFromViper(viper.GetViper())
+	pgConfig := config.NewPostgreSQLConfigFromViper(viper.GetViper())
+	ginConfig := config.NewGinConfigFromViper(viper.GetViper())
+
+	mainDB := postgresql.NewDB(pgConfig.Host, pgConfig.Port, pgConfig.User, pgConfig.Password, pgConfig.Name)
 	err := mainDB.Open()
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	mainDB.GetDB().AutoMigrate()
@@ -58,5 +66,5 @@ func runAPIServer(cmd *cobra.Command, args []string) {
 	walletrouter := walletsginserver.NewWalletRouter(walletUC)
 	walletrouter.SetupRouter(router)
 
-	router.Run()
+	router.Run(fmt.Sprintf(":%d", ginConfig.Port))
 }

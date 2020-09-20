@@ -1,4 +1,5 @@
 tmp
 .vscode
 .air.toml
+.env
 annotations
