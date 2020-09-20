@@ -11,6 +11,7 @@ func MiddlewareAPIError() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		err := c.Errors.Last()
+
 		if err == nil {
 			return
 		}

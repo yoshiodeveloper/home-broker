@@ -1,6 +1,7 @@
 package wallets_test
 
 import (
+	"errors"
 	"fmt"
 	"home-broker/money"
 	userstests "home-broker/tests/users"
@@ -150,7 +151,7 @@ func TestGetWallet_BetweenGetByUserIDAndInsertCalls_ReturnsWallet(t *testing.T) 
 	}
 }
 
-func TestWalletUCIncBalance(t *testing.T) {
+func TestAddFunds(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -174,19 +175,78 @@ func TestWalletUCIncBalance(t *testing.T) {
 
 	returnedEnt := expectedEnt
 
+	retEnt := expectedEnt
+
+	mockDB.EXPECT().
+		GetByUserID(expectedEnt.UserID).
+		Return(&retEnt, nil)
+
 	mockDB.EXPECT().
 		IncBalanceByUserID(expectedEnt.UserID, incValue).
 		Return(&returnedEnt, nil)
 
 	uc := wallets.NewWalletUseCases(mockDB, userUC)
 
-	entity, err := uc.IncBalance(expectedEnt.UserID, incValue)
+	entity, err := uc.AddFunds(expectedEnt.UserID, incValue)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	err = walletstests.CheckWallets(*entity, expectedEnt)
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestAddFunds_InvalidAmount(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockUserDB := userstestsmocks.NewMockUserDBInterface(mockCtrl)
+	userUC := users.NewUserUseCases(mockUserDB)
+
+	mockDB := mocks.NewMockWalletDBInterface(mockCtrl)
+
+	userID := users.UserID(999)
+
+	t.Run("ZeroAmount", func(t *testing.T) {
+		incValue, err := money.NewMoneyFromFloatString("0.0")
+		if err != nil {
+			t.Error(err)
+		}
+
+		uc := wallets.NewWalletUseCases(mockDB, userUC)
+
+		entity, err := uc.AddFunds(userID, incValue)
+		if err == nil {
+			t.Errorf("an error was expected to happen")
+		}
+		if entity != nil {
+			t.Errorf("received entity %v, expected nil", entity)
+		}
+		if !errors.Is(err, wallets.ErrInvalidFundsAmount) {
+			t.Errorf("received error %s, expected ErrInvalidFundsAmount", err)
+		}
+	})
+
+	t.Run("NegativeAmount", func(t *testing.T) {
+		incValue, err := money.NewMoneyFromFloatString("-789.789")
+		if err != nil {
+			t.Error(err)
+		}
+
+		uc := wallets.NewWalletUseCases(mockDB, userUC)
+
+		entity, err := uc.AddFunds(userID, incValue)
+		if err == nil {
+			t.Errorf("an error was expected to happen")
+		}
+		if entity != nil {
+			t.Errorf("received entity %v, expected nil", entity)
+		}
+		if !errors.Is(err, wallets.ErrInvalidFundsAmount) {
+			t.Errorf("received error %s, expected ErrInvalidFundsAmount", err)
+		}
+	})
+
 }

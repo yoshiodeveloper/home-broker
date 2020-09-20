@@ -6,6 +6,11 @@ import (
 	"home-broker/users"
 )
 
+var (
+	// ErrInvalidFundsAmount happens when the amount of a add funds is invalid.
+	ErrInvalidFundsAmount = errors.New("invalid funds amount")
+)
+
 // WalletUseCases represents the wallets use cases.
 type WalletUseCases struct {
 	db     WalletDBInterface
@@ -69,9 +74,18 @@ func (uc WalletUseCases) GetWallet(userID users.UserID) (entity *Wallet, created
 	return nil, false, userCreated, err
 }
 
-// IncBalance increments or decrements the wallet funds (balance).
-// The retuned entity can be nil if the user or wallet does not exist.
-func (uc WalletUseCases) IncBalance(userID users.UserID, amount money.Money) (entity *Wallet, err error) {
+// AddFunds increments the wallet funds (balance).
+// The wallet will be created if it does not exist.
+func (uc WalletUseCases) AddFunds(userID users.UserID, amount money.Money) (entity *Wallet, err error) {
+	if amount <= 0 {
+		return nil, ErrInvalidFundsAmount
+	}
+
+	_, _, _, err = uc.GetWallet(userID) // forces wallet/user creation
+	if err != nil {
+		return nil, err
+	}
+
 	// We leave this job to the ORM as it can optimize this process in a single call.
 	entity, err = uc.db.IncBalanceByUserID(userID, amount)
 	if err != nil {
