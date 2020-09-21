@@ -107,13 +107,13 @@ go run main.go api -o "http://orderbook:8080"
 ## API
 
 ---
-**GET /api/v1/wallets/:user_id:/**
+**GET /api/v1/wallets/USER_ID/**
 
 Returns an user wallet. A new user and an empty wallet are created on the first call.
 
 ----
 
-**POST /api/v1/wallets/:user_id:/add-funds/**
+**POST /api/v1/wallets/USER_ID/add-funds/**
 
 Adds funds (money) to an user wallet. The user and wallet are created on the first call.
 
@@ -124,13 +124,13 @@ Body:
 ```
 ---
 
-**GET /api/v1/wallets/:user_id:/assets/:asset_id:/**
+**GET /api/v1/wallets/USER_ID/assets/ASSET_ID/**
 
 Returns the asset wallet of a user. Ex VIBR (Vibranium).
 
 ---
 
-**GET /api/v1/orders/<id>/**
+**GET /api/v1/orders/ORDER_ID/**
 
 Returns an order (bid/ask) detail.
 
@@ -176,7 +176,7 @@ Body:
 }
 ```
 
-**POST /api/v1/orderbooks/:asset_id:/webhook/**
+**POST /api/v1/orderbooks/ASSET_ID/webhook/**
 
 Receives the updates to change the state of the order book. This is sent by the Main API (that receives from the exchange).
 
