@@ -19,7 +19,7 @@ type (
 	ExternalOrderID string
 
 	// OrderStatus represents the status of an order.
-	OrderStatus int8
+	OrderStatus string
 )
 
 const (
@@ -31,36 +31,42 @@ const (
 
 	// OrderStatusAccepted is an accepted order.
 	// This means that the order was accepted and processed by the exchange.
-	OrderStatusAccepted int8 = 1
+	OrderStatusAccepted = "accepted"
+
+	// OrderStatusPending is an pending order.
+	// This happens when the order was sent to the exchange and we are waiting to process.
+	OrderStatusPending = "pending"
 
 	// OrderStatusDenied is a denied order.
 	// This happens when the order is not accepted or processed by the exchange.
 	// This can happen because of an exchange error or incorrect data.
-	OrderStatusDenied int8 = -1
+	OrderStatusDenied = "denied"
 
-	// OrderStatusPending is an pending order.
-	// This happens when the order was sent to the exchange and we are waiting to process.
-	OrderStatusPending int8 = 2
+	// OrderStatusCanceling is a canceling order.
+	OrderStatusCanceling = "canceling"
+
+	// OrderStatusCanceled is a canceled order.
+	OrderStatusCanceled = "canceled"
 )
 
 // Order is an entity for buying or selling intentions.
 type Order struct {
-	ID                OrderID         // Internal ID.
-	UserID            users.UserID    // Internal user ID.
-	AssetID           assets.AssetID  // Internal asset ID.
-	ExternalID        ExternalOrderID // External order ID (from a Stock Exchange)
-	ExternalTimestamp time.Time       // External timestamp.
-	Amount            int64
-	Price             money.Money
-	Type              OrderType
-	Status            OrderStatus
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	DeletedAt         time.Time
+	ID                OrderID          `json:"id"`                 // Internal ID.
+	UserID            users.UserID     `json:"user_id"`            // Internal user ID.
+	AssetID           assets.AssetID   `json:"asset_id"`           // Internal asset ID.
+	ExternalID        ExternalOrderID  `json:"external_id"`        // External order ID (from a Stock Exchange)
+	ExternalTimestamp time.Time        `json:"external_timestamp"` // External timestamp.
+	Amount            assets.AssetUnit `json:"amount"`
+	Price             money.Money      `json:"price"`
+	Type              OrderType        `json:"type"`
+	Status            OrderStatus      `json:"status"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
+	DeletedAt         time.Time        `json:"-"`
 }
 
 // NewBuyOrder creates a new buying order.
-func NewBuyOrder(assetID assets.AssetID, amount int64, price money.Money) Order {
+func NewBuyOrder(assetID assets.AssetID, amount assets.AssetUnit, price money.Money) Order {
 	return Order{
 		AssetID: assetID,
 		Type:    OrderTypeBuy,
@@ -70,7 +76,7 @@ func NewBuyOrder(assetID assets.AssetID, amount int64, price money.Money) Order 
 }
 
 // NewSellOrder creates a new selling order.
-func NewSellOrder(assetID assets.AssetID, amount int64, price money.Money) Order {
+func NewSellOrder(assetID assets.AssetID, amount assets.AssetUnit, price money.Money) Order {
 	return Order{
 		AssetID: assetID,
 		Type:    OrderTypeSell,

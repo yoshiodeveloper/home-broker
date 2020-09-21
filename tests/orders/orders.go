@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"home-broker/assets"
 	"home-broker/money"
 	"home-broker/orders"
 	testsassets "home-broker/tests/assets"
@@ -14,7 +15,7 @@ var (
 )
 
 // GetOrder returns an order entity.
-func GetOrder(id orders.OrderID, orderType orders.OrderType, price money.Money, amount int64, exTimestamp time.Time) orders.Order {
+func GetOrder(id orders.OrderID, orderType orders.OrderType, price money.Money, amount assets.AssetUnit, exTimestamp time.Time) orders.Order {
 	asset := testsassets.GetAsset()
 	var o orders.Order
 	if orderType == orders.OrderTypeBuy {

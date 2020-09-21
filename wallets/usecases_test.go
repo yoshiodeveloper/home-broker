@@ -1,7 +1,6 @@
 package wallets_test
 
 import (
-	"errors"
 	"fmt"
 	"home-broker/money"
 	userstests "home-broker/tests/users"
@@ -224,9 +223,6 @@ func TestAddFunds_InvalidAmount(t *testing.T) {
 		if entity != nil {
 			t.Errorf("received entity %v, expected nil", entity)
 		}
-		if !errors.Is(err, wallets.ErrInvalidFundsAmount) {
-			t.Errorf("received error %s, expected ErrInvalidFundsAmount", err)
-		}
 	})
 
 	t.Run("NegativeAmount", func(t *testing.T) {
@@ -243,9 +239,6 @@ func TestAddFunds_InvalidAmount(t *testing.T) {
 		}
 		if entity != nil {
 			t.Errorf("received entity %v, expected nil", entity)
-		}
-		if !errors.Is(err, wallets.ErrInvalidFundsAmount) {
-			t.Errorf("received error %s, expected ErrInvalidFundsAmount", err)
 		}
 	})
 

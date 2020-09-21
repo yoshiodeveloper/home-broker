@@ -19,6 +19,11 @@ func NewAPIError(message string, statusCode int) APIError {
 	return APIError{Message: message, StatusCode: statusCode}
 }
 
+// NewAPIErrorFromErrValidation a new APIErro from an ErrValidation.
+func NewAPIErrorFromErrValidation(errValidation ErrValidation) APIError {
+	return APIError{Message: errValidation.Message, StatusCode: 400}
+}
+
 // SetError sets the error.
 func (e *APIError) SetError(err error) {
 	e.Err = err

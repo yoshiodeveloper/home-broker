@@ -19,7 +19,7 @@ func NewWalletRouter(uc wallets.WalletUseCases) WalletRouter {
 // SetupRouter setups wallets router.
 func (wr WalletRouter) SetupRouter(router *gin.Engine) {
 	walletC := NewWalletController(wr.uc)
-	v1 := router.Group("/api/v1/wallet")
+	v1 := router.Group("/api/v1/wallets")
 	{
 		v1.GET(":user_id/", walletC.GetWallet)
 		v1.POST(":user_id/add-funds/", walletC.AddFunds)

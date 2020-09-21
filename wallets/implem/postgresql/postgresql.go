@@ -62,7 +62,7 @@ func (WalletDB) ToEntity(model WalletModel) wallets.Wallet {
 	return entity
 }
 
-// ToModel returns a GORM model from an wallet entity.
+// ToModel returns a GORM model from a wallet entity.
 func (WalletDB) ToModel(entity wallets.Wallet) WalletModel {
 	deletedAt := gorm.DeletedAt{Time: entity.DeletedAt}
 	if !entity.DeletedAt.IsZero() {

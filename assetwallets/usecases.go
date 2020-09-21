@@ -1,9 +1,9 @@
-package wallets
+package assetwallets
 
 import (
 	"errors"
+	"home-broker/assets"
 	"home-broker/core"
-	"home-broker/money"
 	"home-broker/users"
 )
 
@@ -12,27 +12,31 @@ var (
 	ErrInvalidFundsAmount = errors.New("invalid funds amount")
 )
 
-// WalletUseCases represents the wallets use cases.
-type WalletUseCases struct {
-	db     WalletDBInterface
+// AssetWalletUseCases represents the asset wallets use cases.
+type AssetWalletUseCases struct {
+	db     AssetWalletDBInterface
 	userUC users.UserUseCases
 }
 
-// NewWalletUseCases returns a new WalletUseCases.
-func NewWalletUseCases(db WalletDBInterface, userUC users.UserUseCases) WalletUseCases {
-	return WalletUseCases{db: db, userUC: userUC}
+// NewAssetWalletUseCases returns a new WalletUseCases.
+func NewAssetWalletUseCases(db AssetWalletDBInterface, userUC users.UserUseCases) AssetWalletUseCases {
+	return AssetWalletUseCases{db: db, userUC: userUC}
 }
 
-// GetWallet returns a wallet by an user ID.
+// GetAssetWallet returns an asset wallet by an user ID and asset ID.
 // A new empty wallet is created if the wallet does not exist.
 // In this case the user is also created because a missing wallet can be a missing user as well.
 //   The external service that calls our service will only pass valid users.
 //   We are considering that this external service is reliable and we do not need to verify the user.
-func (uc WalletUseCases) GetWallet(userID users.UserID) (entity *Wallet, created bool, userCreated bool, err error) {
+func (uc AssetWalletUseCases) GetAssetWallet(userID users.UserID, assetID assets.AssetID) (entity *AssetWallet, created bool, userCreated bool, err error) {
 	if userID <= 0 {
 		return nil, false, false, core.NewErrValidation("Invalid user ID.")
 	}
-	entity, err = uc.db.GetByUserID(userID)
+	if assetID == "" {
+		return nil, false, false, core.NewErrValidation("Invalid asset ID.")
+	}
+
+	entity, err = uc.db.GetByUserIDAssetID(userID, assetID)
 	if err != nil {
 		return nil, false, false, err
 	}
@@ -41,7 +45,7 @@ func (uc WalletUseCases) GetWallet(userID users.UserID) (entity *Wallet, created
 		return entity, false, false, nil
 	}
 
-	// At this point the wallet was not found.
+	// At this point the asset wallet was not found.
 	// Maybe the user does not exist as well.
 
 	// uc.userUC.GetUser will create the user if needed.
@@ -54,21 +58,29 @@ func (uc WalletUseCases) GetWallet(userID users.UserID) (entity *Wallet, created
 	// but at this time we are leaving this job for the ORM because of problems with
 	// tests using current time.
 
-	balance := money.NewMoneyZero()
+	balance := assets.NewAssetUnitZero()
 
-	newWallet := Wallet{
+	newAssetWallet := AssetWallet{
 		UserID:  userID,
+		AssetID: assetID,
 		Balance: balance,
 	}
 
-	entity, err = uc.db.Insert(newWallet)
+	entity, err = uc.db.Insert(newAssetWallet)
 	if err == nil {
 		return entity, true, userCreated, nil
 	}
 
-	if errors.Is(err, ErrWalletAlreadyExists) {
+	switch err {
+	case assets.ErrAssetDoesNotExist:
+		return nil, false, userCreated, core.NewErrValidation("Asset does not exist.")
+	case users.ErrUserDoesNotExist:
+		return nil, false, userCreated, core.NewErrValidation("User does not exist.")
+	}
+
+	if errors.Is(err, ErrAssetWalletAlreadyExists) {
 		// Maybe the wallet was inserted by other process in the meantime.
-		entity, err = uc.db.GetByUserID(userID)
+		entity, err = uc.db.GetByUserIDAssetID(userID, assetID)
 		if err == nil {
 			return entity, false, userCreated, nil
 		}
@@ -78,22 +90,26 @@ func (uc WalletUseCases) GetWallet(userID users.UserID) (entity *Wallet, created
 	return nil, false, userCreated, err
 }
 
-// AddFunds increments the wallet funds (balance).
+// AddFunds increments the asset wallet funds (balance).
 // The wallet will be created if it does not exist.
-func (uc WalletUseCases) AddFunds(userID users.UserID, amount money.Money) (entity *Wallet, err error) {
+func (uc AssetWalletUseCases) AddFunds(userID users.UserID, assetID assets.AssetID, amount assets.AssetUnit) (entity *AssetWallet, err error) {
 	if userID <= 0 {
 		return nil, core.NewErrValidation("Invalid user ID.")
+	}
+	if assetID == "" {
+		return nil, core.NewErrValidation("Invalid asset ID.")
 	}
 	if amount <= 0 {
 		return nil, core.NewErrValidation("Invalid amount.")
 	}
-	_, _, _, err = uc.GetWallet(userID) // forces wallet/user creation
+
+	_, _, _, err = uc.GetAssetWallet(userID, assetID) // forces asset wallet/user creation
 	if err != nil {
 		return nil, err
 	}
 
 	// We leave this job to the ORM as it can optimize this process in a single call.
-	entity, err = uc.db.IncBalanceByUserID(userID, amount)
+	entity, err = uc.db.IncBalanceByUserIDAssetID(userID, assetID, amount)
 	if err != nil {
 		return nil, err
 	}

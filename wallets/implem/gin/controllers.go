@@ -1,7 +1,6 @@
 package walletsgin
 
 import (
-	"errors"
 	"home-broker/core"
 	"home-broker/money"
 	"home-broker/users"
@@ -14,8 +13,8 @@ import (
 
 var (
 	apiErrorInvalidJSON        = core.NewAPIError("Invalid JSON.", 400)
-	apiErrorInvalidFundsAmount = core.NewAPIError("The funds amount is invalid.", 400)
-	apiErrorInvalidUserID      = core.NewAPIError("User ID is invalid.", 400)
+	apiErrorInvalidFundsAmount = core.NewAPIError("Invalid funds amount.", 400)
+	apiErrorInvalidUserID      = core.NewAPIError("Invalid user ID", 400)
 )
 
 // WalletController represents a wallet controller.
@@ -65,8 +64,9 @@ func (walletC WalletController) AddFunds(c *gin.Context) {
 
 	entity, err := walletC.uc.AddFunds(users.UserID(userID), json.Amount)
 	if err != nil {
-		if errors.Is(err, wallets.ErrInvalidFundsAmount) {
-			c.Error(apiErrorInvalidFundsAmount)
+		errVal, ok := err.(core.ErrValidation)
+		if ok {
+			c.Error(core.NewAPIErrorFromErrValidation(errVal))
 			return
 		}
 		c.Error(err)

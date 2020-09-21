@@ -1,9 +1,12 @@
 package orders_test
 
 import (
+	"home-broker/assets"
 	"home-broker/money"
+	"home-broker/orderbooks"
 	"home-broker/orders"
-	testsorders "home-broker/tests/orders"
+	assetstests "home-broker/tests/assets"
+	orderstests "home-broker/tests/orders"
 	"math/rand"
 	"testing"
 	"time"
@@ -13,7 +16,7 @@ func TestOrderAddOrder_AddManyBuyOrders_BuyOrdersAddedSorted(t *testing.T) {
 	tests := 1000
 	expectedOrders := make([]orders.Order, 0)
 	insertionOrders := make([]orders.Order, 0)
-	exTime := testsorders.BaseTime
+	exTime := orderstests.BaseTime
 
 	// This creates a list of offers in the expected order.
 	// Each price level will have 10 orders with the same price but different time.
@@ -23,7 +26,7 @@ func TestOrderAddOrder_AddManyBuyOrders_BuyOrdersAddedSorted(t *testing.T) {
 			// Creates 10 equals prices (same price level).
 			price -= money.Money(1) // decrementing
 		}
-		order := testsorders.GetOrder(orders.OrderID(i+1), orders.OrderTypeBuy, price, int64(i+1), exTime)
+		order := orderstests.GetOrder(orders.OrderID(i+1), orders.OrderTypeBuy, price, assets.AssetUnit(i+1), exTime)
 		expectedOrders = append(expectedOrders, order)
 		insertionOrders = append(insertionOrders, order)
 		if i%2 == 0 {
@@ -72,7 +75,7 @@ func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 	tests := 1000
 	expectedOrders := make([]orders.Order, 0)
 	insertionOrders := make([]orders.Order, 0)
-	exTime := baseTime
+	exTime := orderstests.BaseTime
 
 	// This creates a list of offers in the expected order.
 	// Each price level will have 10 orders with the same price but different time.
@@ -82,7 +85,7 @@ func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 			// Creates 10 equals prices (same price level).
 			price += money.Money(1) // incrementing
 		}
-		order := GetTestOrder(int64(i+1), domain.OrderTypeSell, price, int64(i+1), exTime)
+		order := orderstests.GetOrder(orders.OrderID(i+1), orders.OrderTypeSell, price, assets.AssetUnit(i+1), exTime)
 		expectedOrders = append(expectedOrders, order)
 		insertionOrders = append(insertionOrders, order)
 		if i%2 == 0 {
@@ -98,7 +101,7 @@ func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 		insertionOrders[i], insertionOrders[j] = insertionOrders[j], insertionOrders[i]
 	})
 
-	ob := domain.NewOrderBook(expectedOrders[0].AssetID)
+	ob := orderbooks.NewOrderBook(expectedOrders[0].AssetID)
 	for i, order := range insertionOrders {
 		if order.Price == 0 {
 			t.Errorf("insertionOrders[%d] has no Price: %v", i, order)
@@ -128,42 +131,42 @@ func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 }
 
 func BenchmarkOderBookInsertion(b *testing.B) {
-	asset := GetTestAsset()
-	ob := domain.NewOrderBook(asset.ID)
-	var orderType domain.OrderType
+	asset := assetstests.GetAsset()
+	ob := orderbooks.NewOrderBook(asset.ID)
+	var orderType orders.OrderType
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if i%2 == 0 {
-			orderType = domain.OrderTypeBuy
+			orderType = orders.OrderTypeBuy
 		} else {
-			orderType = domain.OrderTypeSell
+			orderType = orders.OrderTypeSell
 		}
-		orderID := rand.Int63() + 1
-		amount := rand.Int63n(10000) + 1
+		orderID := orders.OrderID(rand.Int63() + 1)
+		amount := assets.AssetUnit(rand.Int63n(10000) + 1)
 		exTime := time.Now()
 		// 100k price levels (ex: $0.01 ~ $1000.01)
-		price := domain.Money(rand.Int63n(100000) + 1)
-		order := GetTestOrder(orderID, orderType, price, amount, exTime)
+		price := money.Money(rand.Int63n(100000) + 1)
+		order := orderstests.GetOrder(orderID, orderType, price, amount, exTime)
 		ob.AddOrder(order)
 	}
 }
 
 func BenchmarkOderBookSnapshots(b *testing.B) {
-	asset := GetTestAsset()
-	ob := domain.NewOrderBook(asset.ID)
-	var orderType domain.OrderType
+	asset := assetstests.GetAsset()
+	ob := orderbooks.NewOrderBook(asset.ID)
+	var orderType orders.OrderType
 	for i := 0; i < 100000; i++ {
 		if i%2 == 0 {
-			orderType = domain.OrderTypeBuy
+			orderType = orders.OrderTypeBuy
 		} else {
-			orderType = domain.OrderTypeSell
+			orderType = orders.OrderTypeSell
 		}
-		orderID := rand.Int63() + 1
-		amount := rand.Int63n(10000) + 1
+		orderID := orders.OrderID(rand.Int63() + 1)
+		amount := assets.AssetUnit(rand.Int63n(10000) + 1)
 		exTime := time.Now()
 		// 100k price levels (ex: $0.01 ~ $1000.01)
-		price := domain.Money(rand.Int63n(100000) + 1)
-		order := GetTestOrder(orderID, orderType, price, amount, exTime)
+		price := money.Money(rand.Int63n(100000) + 1)
+		order := orderstests.GetOrder(orderID, orderType, price, amount, exTime)
 		ob.AddOrder(order)
 	}
 	b.ResetTimer()

@@ -25,7 +25,7 @@ type PriceLevel struct {
 	Price     money.Money
 	Type      orders.OrderType
 	// Total sum of amount of this price level.
-	AmountSum int64
+	AmountSum assets.AssetUnit
 	// Total count of orders of this price level.
 	OrdersCount int64
 }
@@ -147,10 +147,40 @@ func (ob *OrderBook) addNewPriceLevelOrder(order orders.Order) {
 	}
 }
 
-// AddOrder adds a order into the OrderBook.
+// AddOrder adds an order into the OrderBook.
 func (ob *OrderBook) AddOrder(order orders.Order) {
-	// We receive the order as a copy we can pass on as reference.
 	ob.addNewPriceLevelOrder(order)
+}
+
+// RemoveOrder removes an order from the OrderBook.
+func (ob *OrderBook) RemoveOrder(order orders.Order) {
+	priceLevel, _ := ob.PriceLevelsByPrices[order.Type][order.Price]
+	if priceLevel == nil {
+		return
+	}
+
+	plOrder := ob.OrdersByOrderID[order.ID]
+	if plOrder == nil {
+		return
+	}
+
+	if plOrder.Right != nil {
+		plOrder.Right.Left = plOrder.Left
+	}
+
+	if plOrder.Left == nil { // head
+		priceLevel.OrderHead = plOrder.Right
+	} else {
+		plOrder.Left.Right = plOrder.Right
+	}
+
+	plOrder.Left = nil
+	plOrder.Right = nil
+
+	delete(ob.OrdersByOrderID, order.ID)
+	ob.OrdersCount[order.Type]--
+	priceLevel.AmountSum -= order.Amount
+	priceLevel.OrdersCount--
 }
 
 // GetBuyOrders returns a slice of buying orders.
