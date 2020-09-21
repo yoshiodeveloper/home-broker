@@ -145,6 +145,54 @@ func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 	}
 }
 
+func TestOrderAddOrder_MatchTwoOrders(t *testing.T) {
+	exTime := orderstests.BaseTime
+	orders := []orderbooks.Order{
+		orderbooks.Order{Mine: true, ID: orders.ExternalOrderID("ex1"), Type: "buy", Price: money.Money(1), Amount: assets.AssetUnit(1), Timestamp: exTime.Add(1 * time.Nanosecond)},
+		orderbooks.Order{ID: orders.ExternalOrderID("ex2"), Type: "sell", Price: money.Money(1), Amount: assets.AssetUnit(1), Timestamp: exTime.Add(2 * time.Nanosecond)},
+	}
+
+	ob := orderbooks.NewOrderBook(assets.AssetID("VIBR"))
+	match := ob.AddOrder(orders[0])
+	if match != nil {
+		t.Errorf("nil expected, found %v", match)
+	}
+	match = ob.AddOrder(orders[1])
+	if match == nil {
+		t.Errorf("match expected, found nil")
+	}
+}
+
+func TestOrderAddOrder_MatchFiveOrders(t *testing.T) {
+	exTime := orderstests.BaseTime
+	orders := []orderbooks.Order{
+		orderbooks.Order{ID: orders.ExternalOrderID("ex1"), Type: "buy", Price: money.Money(1), Amount: assets.AssetUnit(1), Timestamp: exTime.Add(1 * time.Nanosecond)},
+		orderbooks.Order{ID: orders.ExternalOrderID("ex2"), Type: "buy", Price: money.Money(2), Amount: assets.AssetUnit(1), Timestamp: exTime.Add(2 * time.Nanosecond)},
+		orderbooks.Order{Mine: true, ID: orders.ExternalOrderID("ex3"), Type: "sell", Price: money.Money(5), Amount: assets.AssetUnit(1), Timestamp: exTime.Add(3 * time.Nanosecond)},
+		orderbooks.Order{ID: orders.ExternalOrderID("ex2"), Type: "sell", Price: money.Money(6), Amount: assets.AssetUnit(1), Timestamp: exTime.Add(4 * time.Nanosecond)},
+		orderbooks.Order{ID: orders.ExternalOrderID("ex2"), Type: "sell", Price: money.Money(7), Amount: assets.AssetUnit(1), Timestamp: exTime.Add(5 * time.Nanosecond)},
+		orderbooks.Order{ID: orders.ExternalOrderID("ex2"), Type: "sell", Price: money.Money(5), Amount: assets.AssetUnit(1), Timestamp: exTime.Add(6 * time.Nanosecond)},
+	}
+
+	ob := orderbooks.NewOrderBook(assets.AssetID("VIBR"))
+	for i, order := range orders {
+		match := ob.AddOrder(order)
+		if i != 6 {
+			if match != nil {
+				t.Errorf("expected nil at index %v, found %v", i, match)
+			}
+		} else {
+			// 5
+			if match == nil {
+				t.Errorf("expected non-nil at index %v", i)
+			}
+			if match.InterestedOrder.ID != orders[i].ID {
+				t.Errorf("expected ID %v, received %v", orders[i].ID, match.InterestedOrder.ID)
+			}
+		}
+	}
+}
+
 func BenchmarkOderBookInsertion(b *testing.B) {
 	asset := assetstests.GetAsset()
 	ob := orderbooks.NewOrderBook(asset.ID)
@@ -162,6 +210,7 @@ func BenchmarkOderBookInsertion(b *testing.B) {
 		// 100k price levels (ex: $0.01 ~ $1000.01)
 		price := money.Money(rand.Int63n(100000) + 1)
 		order := orderbooks.Order{
+			Mine:      true,
 			ID:        orderID,
 			Type:      orderType,
 			Price:     price,
@@ -188,6 +237,7 @@ func BenchmarkOderBookSnapshots(b *testing.B) {
 		// 100k price levels (ex: $0.01 ~ $1000.01)
 		price := money.Money(rand.Int63n(100000) + 1)
 		order := orderbooks.Order{
+			Mine:      true,
 			ID:        orderID,
 			Type:      orderType,
 			Price:     price,

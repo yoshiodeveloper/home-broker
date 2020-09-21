@@ -201,12 +201,20 @@ func (uc OrderUseCases) CancelOrder(orderID OrderID) (*Order, error) {
 // ProcessExternalUpdate process an order update received from an exchange service.
 // These updates change the state of an Order Book.
 func (uc OrderUseCases) ProcessExternalUpdate(externalUp ExternalUpdate) error {
-	err := uc.updateOrderBook(externalUp)
+	entity, err := uc.db.GetByExternalIDAssetID(externalUp.ID, externalUp.AssetID)
+	if err != nil {
+		log.Printf("erro while trying to get ther order from db: %v\n", err)
+	}
+	if entity != nil {
+		externalUp.Mine = true
+	}
+
+	err = uc.updateOrderBook(externalUp)
 	if err != nil {
 		log.Printf("error to update order book: %v\n", err)
 	}
 	if externalUp.Action == ExternalUpdateActionTraded {
-		err = uc.processExternalUpdateTraded(externalUp)
+		err = uc.processExternalUpdateTraded(entity, externalUp)
 	}
 	return err
 }
@@ -217,7 +225,6 @@ func (uc OrderUseCases) updateOrderBook(externalUp ExternalUpdate) error {
 	json, err := json.Marshal(externalUp)
 	resp, err := http.Post(url, "application/json; charset=utf-8", bytes.NewBuffer(json))
 	if err != nil {
-
 		return err
 	}
 	defer resp.Body.Close()
@@ -227,50 +234,40 @@ func (uc OrderUseCases) updateOrderBook(externalUp ExternalUpdate) error {
 	return nil
 }
 
-func (uc OrderUseCases) processExternalUpdateAdded(externalUp ExternalUpdate) error {
-	return nil
-}
-
-func (uc OrderUseCases) processExternalUpdateDeleted(externalUp ExternalUpdate) error {
-	return nil
-}
-
-func (uc OrderUseCases) processExternalUpdateTraded(externalUp ExternalUpdate) error {
-	entity, err := uc.db.GetByExternalIDAssetID(externalUp.ID, externalUp.AssetID)
-	if err != nil {
-		return err
-	}
-	if entity == nil {
+func (uc OrderUseCases) processExternalUpdateTraded(order *Order, externalUp ExternalUpdate) error {
+	if order == nil {
 		// The user and/or asset is not from this home broker.
 		return nil
 	}
 
+	var err error
+
 	// TODO: This is not the best way.
 	// We should put everything inside a transaction.
-	switch entity.Type {
+	switch order.Type {
 	case OrderTypeBuy:
 		// On buy, we remove money and add assets.
 		valueMoney := money.Money(math.Abs(float64(int64(externalUp.Amount) * int64(externalUp.Price))))
 		valueMoney *= -1
-		_, err = uc.walletUC.IncBalanceByUserID(entity.UserID, valueMoney)
+		_, err = uc.walletUC.IncBalanceByUserID(order.UserID, valueMoney)
 		if err != nil {
 			return err
 		}
 		amountAssets := assets.AssetUnit(math.Abs(float64(externalUp.Amount)))
-		_, err = uc.assetWalletUC.IncBalanceByUserIDAssetID(entity.UserID, entity.AssetID, amountAssets)
+		_, err = uc.assetWalletUC.IncBalanceByUserIDAssetID(order.UserID, order.AssetID, amountAssets)
 		if err != nil {
 			return err
 		}
 	case OrderTypeSell:
 		// On sell, we add money and remove assets.
-		valueMoney := money.Money(math.Abs(float64(int64(entity.Amount) * int64(entity.Price))))
-		_, err = uc.walletUC.IncBalanceByUserID(entity.UserID, valueMoney)
+		valueMoney := money.Money(math.Abs(float64(int64(order.Amount) * int64(order.Price))))
+		_, err = uc.walletUC.IncBalanceByUserID(order.UserID, valueMoney)
 		if err != nil {
 			return err
 		}
-		amountAssets := assets.AssetUnit(math.Abs(float64(entity.Amount)))
+		amountAssets := assets.AssetUnit(math.Abs(float64(order.Amount)))
 		amountAssets *= -1
-		_, err = uc.assetWalletUC.IncBalanceByUserIDAssetID(entity.UserID, entity.AssetID, amountAssets)
+		_, err = uc.assetWalletUC.IncBalanceByUserIDAssetID(order.UserID, order.AssetID, amountAssets)
 		if err != nil {
 			return err
 		}

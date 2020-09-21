@@ -4,6 +4,7 @@ import (
 	"home-broker/assets"
 	"home-broker/money"
 	"home-broker/orders"
+	"log"
 	"sync"
 	"time"
 )
@@ -11,12 +12,14 @@ import (
 // Order holds an order sent by an exchange service.
 // This not the same as "orders.Order".
 type Order struct {
+	Mine      bool                   `json:"mine"`
 	ID        orders.ExternalOrderID `json:"id"`
 	AssetID   assets.AssetID         `json:"asset_id"`
 	Price     money.Money            `json:"price"`
 	Amount    assets.AssetUnit       `json:"amount"`
 	Type      orders.OrderType       `json:"type"`
 	Timestamp time.Time              `json:"timestamp"`
+	InTrade   bool                   `json:"in_trade"`
 }
 
 // BetterThan returns true if this order is better offer than order parameter.
@@ -34,6 +37,13 @@ func (o Order) BetterThan(order Order) bool {
 		return true
 	}
 	return false
+}
+
+// TradeRequest represents a trade request.
+type TradeRequest struct {
+	InterestedOrder Order
+	InterestOrder   Order
+	Amount          assets.AssetUnit
 }
 
 // PriceLevelOrder is a struct for an order inside OrderBookPriceLevel.
@@ -152,7 +162,7 @@ func (ob *OrderBook) addNewPriceLevel(order Order) *PriceLevel {
 	return priceLevel
 }
 
-func (ob *OrderBook) addNewPriceLevelOrder(order Order) {
+func (ob *OrderBook) addNewPriceLevelOrder(order Order) *PriceLevelOrder {
 	priceLevel, _ := ob.PriceLevelsByPrices[order.Type][order.Price]
 	if priceLevel == nil {
 		priceLevel = ob.addNewPriceLevel(order)
@@ -163,7 +173,7 @@ func (ob *OrderBook) addNewPriceLevelOrder(order Order) {
 
 	plOrder := ob.OrdersByOrderID[order.ID] // this ID is an external ID
 	if plOrder != nil {
-		return
+		return nil
 	}
 	plOrder = &PriceLevelOrder{Order: order}
 	ob.OrdersByOrderID[plOrder.Order.ID] = plOrder
@@ -171,7 +181,7 @@ func (ob *OrderBook) addNewPriceLevelOrder(order Order) {
 
 	if priceLevel.OrderHead == nil {
 		priceLevel.OrderHead = plOrder
-		return
+		return plOrder
 	}
 
 	currPLOrder := priceLevel.OrderHead
@@ -194,11 +204,73 @@ func (ob *OrderBook) addNewPriceLevelOrder(order Order) {
 		}
 		currPLOrder = currPLOrder.Right
 	}
+	return plOrder
 }
 
 // AddOrder adds an order into the OrderBook.
-func (ob *OrderBook) AddOrder(order Order) {
-	ob.addNewPriceLevelOrder(order)
+func (ob *OrderBook) AddOrder(order Order) *TradeRequest {
+	newPLOrder := ob.addNewPriceLevelOrder(order)
+	if newPLOrder == nil {
+		return nil
+	}
+	return ob.checksIfMatchs(newPLOrder)
+}
+
+// checksIfMatchs checks if order has a match.
+func (ob *OrderBook) checksIfMatchs(plOrder *PriceLevelOrder) *TradeRequest {
+	firstBuyPL := ob.PriceLevelsHeads[orders.OrderTypeBuy]
+	firstSellPL := ob.PriceLevelsHeads[orders.OrderTypeSell]
+	if firstBuyPL == nil || firstBuyPL.OrderHead == nil {
+		return nil
+	}
+	if firstSellPL == nil || firstSellPL.OrderHead == nil {
+		return nil
+	}
+
+	if firstBuyPL.OrderHead.Order.InTrade || firstSellPL.OrderHead.Order.InTrade {
+		return nil
+	}
+
+	if firstBuyPL.OrderHead.Order.Price < firstSellPL.OrderHead.Order.Price {
+		return nil
+	}
+
+	if !(firstBuyPL.OrderHead.Order.Mine || firstSellPL.OrderHead.Order.Mine) {
+		return nil
+	}
+
+	// Match!
+	amount := firstBuyPL.OrderHead.Order.Amount
+	if firstBuyPL.OrderHead.Order.Amount > firstSellPL.OrderHead.Order.Amount {
+		amount = firstSellPL.OrderHead.Order.Amount
+	}
+
+	var tradeReq *TradeRequest
+
+	firstBuyPL.OrderHead.Order.InTrade = true
+	firstSellPL.OrderHead.Order.InTrade = true
+
+	if firstBuyPL.OrderHead.Order.Mine {
+		tradeReq = &TradeRequest{
+			InterestedOrder: firstBuyPL.OrderHead.Order,
+			InterestOrder:   firstSellPL.OrderHead.Order,
+			Amount:          amount,
+		}
+	} else {
+		tradeReq = &TradeRequest{
+			InterestedOrder: firstSellPL.OrderHead.Order,
+			InterestOrder:   firstBuyPL.OrderHead.Order,
+			Amount:          amount,
+		}
+	}
+	if tradeReq != nil {
+		log.Printf("Order match! %v-%v-$%v-%vqty: True, = %v-%v-$%v-%vqty (amount take %v)",
+			tradeReq.InterestedOrder.Type, tradeReq.InterestedOrder.ID, tradeReq.InterestedOrder.Price, tradeReq.InterestedOrder.Amount,
+			tradeReq.InterestOrder.Type, tradeReq.InterestOrder.ID, tradeReq.InterestOrder.Price, tradeReq.InterestOrder.Amount,
+			tradeReq.Amount,
+		)
+	}
+	return tradeReq
 }
 
 // DecOrderAmount decrement an order amount.
@@ -207,6 +279,7 @@ func (ob *OrderBook) DecOrderAmount(order Order) {
 	if plOrder == nil {
 		return
 	}
+	plOrder.Order.InTrade = false
 	plOrder.Order.Amount -= order.Amount
 	if plOrder.Order.Amount <= 0 {
 		ob.RemoveOrder(order)

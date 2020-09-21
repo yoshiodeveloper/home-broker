@@ -38,6 +38,7 @@ func (orderBookUC OrderBookUseCases) Webhook(externalUp orders.ExternalUpdate) (
 	}
 
 	order := Order{ // this is not the same as "orders.Order" type.
+		Mine:      externalUp.Mine,
 		ID:        externalUp.ID,
 		AssetID:   externalUp.AssetID,
 		Price:     externalUp.Price,
@@ -46,16 +47,26 @@ func (orderBookUC OrderBookUseCases) Webhook(externalUp orders.ExternalUpdate) (
 		Timestamp: externalUp.Timestamp,
 	}
 
-	orderBookUC.orderBook.Lock()
-	defer orderBookUC.orderBook.Unlock()
+	var tradeRequest *TradeRequest
 
-	switch externalUp.Action {
-	case "added":
-		orderBookUC.orderBook.AddOrder(order)
-	case "deleted":
-		orderBookUC.orderBook.RemoveOrder(order)
-	case "traded":
-		orderBookUC.orderBook.DecOrderAmount(order)
+	func() {
+		orderBookUC.orderBook.Lock()
+		defer orderBookUC.orderBook.Unlock()
+
+		switch externalUp.Action {
+		case "added":
+			tradeRequest = orderBookUC.orderBook.AddOrder(order)
+
+		case "deleted":
+			orderBookUC.orderBook.RemoveOrder(order)
+		case "traded":
+			orderBookUC.orderBook.DecOrderAmount(order)
+		}
+	}()
+
+	if tradeRequest != nil {
+		// TODO: Do request on the exchange OR on a kafka topic.
+		// We also need to change the order status.
 	}
 
 	return WebhookResponse{

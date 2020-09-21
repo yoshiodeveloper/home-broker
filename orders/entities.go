@@ -96,6 +96,7 @@ func NewSellOrder(assetID assets.AssetID, amount assets.AssetUnit, price money.M
 
 // ExternalUpdate holds an order update sent by an exchange service.
 type ExternalUpdate struct {
+	Mine      bool             `json:"mine"` // special flag to indicates that this order is from this system
 	ID        ExternalOrderID  `json:"id"`
 	AssetID   assets.AssetID   `json:"asset_id"`
 	Price     money.Money      `json:"price"`
