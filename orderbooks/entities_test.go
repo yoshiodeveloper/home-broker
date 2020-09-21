@@ -5,18 +5,19 @@ import (
 	"home-broker/money"
 	"home-broker/orderbooks"
 	"home-broker/orders"
-	testsassets "home-broker/tests/assets"
-	testsorders "home-broker/tests/orders"
+	assetstests "home-broker/tests/assets"
+	orderstests "home-broker/tests/orders"
 	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 )
 
 func TestOrderAddOrder_AddManyBuyOrders_BuyOrdersAddedSorted(t *testing.T) {
 	tests := 1000
-	expectedOrders := make([]orders.Order, 0)
-	insertionOrders := make([]orders.Order, 0)
-	exTime := testsorders.BaseTime
+	expectedOrders := make([]orderbooks.Order, 0)
+	insertionOrders := make([]orderbooks.Order, 0)
+	exTime := orderstests.BaseTime
 
 	// This creates a list of offers in the expected order.
 	// Each price level will have 10 orders with the same price but different time.
@@ -26,7 +27,14 @@ func TestOrderAddOrder_AddManyBuyOrders_BuyOrdersAddedSorted(t *testing.T) {
 			// Creates 10 equals prices (same price level).
 			price -= money.Money(1) // decrementing
 		}
-		order := testsorders.GetOrder(orders.OrderID(i+1), orders.OrderTypeBuy, price, assets.AssetUnit(i+1), exTime)
+
+		order := orderbooks.Order{
+			ID:        orders.ExternalOrderID(strconv.Itoa(i + 1)),
+			Type:      orders.OrderTypeBuy,
+			Price:     price,
+			Amount:    assets.AssetUnit(i + 1),
+			Timestamp: exTime,
+		}
 		expectedOrders = append(expectedOrders, order)
 		insertionOrders = append(insertionOrders, order)
 		if i%2 == 0 {
@@ -65,17 +73,17 @@ func TestOrderAddOrder_AddManyBuyOrders_BuyOrdersAddedSorted(t *testing.T) {
 		if order.Price != expectedOrder.Price {
 			t.Errorf("order[%d].Price is %v, expected %v", i, order.Price, expectedOrder.Price)
 		}
-		if order.ExternalTimestamp != expectedOrder.ExternalTimestamp {
-			t.Errorf("order[%d].ExternalTimestamp is %v, expected %v", i, order.ExternalTimestamp, expectedOrder.ExternalTimestamp)
+		if order.Timestamp != expectedOrder.Timestamp {
+			t.Errorf("order[%d].Timestamp is %v, expected %v", i, order.Timestamp, expectedOrder.Timestamp)
 		}
 	}
 }
 
 func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 	tests := 1000
-	expectedOrders := make([]orders.Order, 0)
-	insertionOrders := make([]orders.Order, 0)
-	exTime := testsorders.BaseTime
+	expectedOrders := make([]orderbooks.Order, 0)
+	insertionOrders := make([]orderbooks.Order, 0)
+	exTime := orderstests.BaseTime
 
 	// This creates a list of offers in the expected order.
 	// Each price level will have 10 orders with the same price but different time.
@@ -85,7 +93,14 @@ func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 			// Creates 10 equals prices (same price level).
 			price += money.Money(1) // incrementing
 		}
-		order := testsorders.GetOrder(orders.OrderID(i+1), orders.OrderTypeSell, price, assets.AssetUnit(i+1), exTime)
+		order := orderbooks.Order{
+			ID:        orders.ExternalOrderID(strconv.Itoa(i + 1)),
+			Type:      orders.OrderTypeSell,
+			Price:     price,
+			Amount:    assets.AssetUnit(i + 1),
+			Timestamp: exTime,
+		}
+
 		expectedOrders = append(expectedOrders, order)
 		insertionOrders = append(insertionOrders, order)
 		if i%2 == 0 {
@@ -124,14 +139,14 @@ func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 		if order.Price != expectedOrder.Price {
 			t.Errorf("order[%d].Price is %v, expected %v", i, order.Price, expectedOrder.Price)
 		}
-		if order.ExternalTimestamp != expectedOrder.ExternalTimestamp {
-			t.Errorf("order[%d].ExternalTimestamp is %v, expected %v", i, order.ExternalTimestamp, expectedOrder.ExternalTimestamp)
+		if order.Timestamp != expectedOrder.Timestamp {
+			t.Errorf("order[%d].Timestamp is %v, expected %v", i, order.Timestamp, expectedOrder.Timestamp)
 		}
 	}
 }
 
 func BenchmarkOderBookInsertion(b *testing.B) {
-	asset := testsassets.GetAsset()
+	asset := assetstests.GetAsset()
 	ob := orderbooks.NewOrderBook(asset.ID)
 	var orderType orders.OrderType
 	b.ResetTimer()
@@ -141,18 +156,24 @@ func BenchmarkOderBookInsertion(b *testing.B) {
 		} else {
 			orderType = orders.OrderTypeSell
 		}
-		orderID := orders.OrderID(rand.Int63() + 1)
+		orderID := orders.ExternalOrderID(strconv.Itoa(int(rand.Int63()) + 1))
 		amount := assets.AssetUnit(rand.Int63n(10000) + 1)
 		exTime := time.Now()
 		// 100k price levels (ex: $0.01 ~ $1000.01)
 		price := money.Money(rand.Int63n(100000) + 1)
-		order := testsorders.GetOrder(orderID, orderType, price, amount, exTime)
+		order := orderbooks.Order{
+			ID:        orderID,
+			Type:      orderType,
+			Price:     price,
+			Amount:    amount,
+			Timestamp: exTime,
+		}
 		ob.AddOrder(order)
 	}
 }
 
 func BenchmarkOderBookSnapshots(b *testing.B) {
-	asset := testsassets.GetAsset()
+	asset := assetstests.GetAsset()
 	ob := orderbooks.NewOrderBook(asset.ID)
 	var orderType orders.OrderType
 	for i := 0; i < 100000; i++ {
@@ -161,12 +182,18 @@ func BenchmarkOderBookSnapshots(b *testing.B) {
 		} else {
 			orderType = orders.OrderTypeSell
 		}
-		orderID := orders.OrderID(rand.Int63() + 1)
+		orderID := orders.ExternalOrderID(strconv.Itoa(int(rand.Int63()) + 1))
 		amount := assets.AssetUnit(rand.Int63n(10000) + 1)
 		exTime := time.Now()
 		// 100k price levels (ex: $0.01 ~ $1000.01)
 		price := money.Money(rand.Int63n(100000) + 1)
-		order := testsorders.GetOrder(orderID, orderType, price, amount, exTime)
+		order := orderbooks.Order{
+			ID:        orderID,
+			Type:      orderType,
+			Price:     price,
+			Amount:    amount,
+			Timestamp: exTime,
+		}
 		ob.AddOrder(order)
 	}
 	b.ResetTimer()

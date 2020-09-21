@@ -5,27 +5,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// AppConfig holds general application configurations.
-type AppConfig struct {
-	Env         string // dev / test / prod
-	TradedAsset string // asset this app will handle
-}
-
-// NewAppConfigFromViper returns a new NewAppConfig from viper.
-func NewAppConfigFromViper(v *viper.Viper) AppConfig {
-	c := AppConfig{
-		Env:         viper.GetString("HOMEBROKERENV"),
-		TradedAsset: viper.GetString("TRADED_ASSET"),
-	}
-	if c.Env != "prod" {
-		c.Env = "dev"
-	}
-	if c.TradedAsset != "" {
-		c.TradedAsset = "VIBR"
-	}
-	return c
-}
-
 // PostgreSQLConfig holds the PostgreSQL configurations.
 type PostgreSQLConfig struct {
 	Host     string
@@ -80,7 +59,7 @@ func NewGinConfigFromViper(v *viper.Viper) GinConfig {
 			c.Port = 8080
 		}
 	}
-	if c.Mode == "release" {
+	if c.Mode != "release" {
 		c.Mode = viper.GetString("GIN_MODE") // original gin var
 		if c.Mode != "release" {
 			c.Mode = "debug"

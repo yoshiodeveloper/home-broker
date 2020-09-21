@@ -94,23 +94,6 @@ func NewSellOrder(assetID assets.AssetID, amount assets.AssetUnit, price money.M
 	}
 }
 
-// BetterThan returns true if this order is better offer than order parameter.
-func (o Order) BetterThan(order Order) bool {
-	/*
-		// These checks are not been used, as we check the order already inside a price level (at same price).
-		if o.Type == OrderTypeBuy && o.Price > order.Price {
-			return true
-		}
-		if o.Type == OrderTypeSell && o.Price < order.Price {
-			return true
-		}
-	*/
-	if o.ExternalTimestamp.Before(order.ExternalTimestamp) {
-		return true
-	}
-	return false
-}
-
 // ExternalUpdate holds an order update sent by an exchange service.
 type ExternalUpdate struct {
 	ID        ExternalOrderID  `json:"id"`
@@ -118,6 +101,6 @@ type ExternalUpdate struct {
 	Price     money.Money      `json:"price"`
 	Amount    assets.AssetUnit `json:"amount"`
 	Type      OrderType        `json:"type"`
-	Action    string           `json:"action"` // added / deleted / traded
 	Timestamp time.Time        `json:"timestamp"`
+	Action    string           `json:"action"` // added / deleted / traded
 }

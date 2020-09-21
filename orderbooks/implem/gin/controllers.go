@@ -5,6 +5,7 @@ import (
 	"home-broker/assets"
 	"home-broker/core"
 	"home-broker/orderbooks"
+	"home-broker/orders"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +33,7 @@ func (orderBookC OrderBookController) Webhook(c *gin.Context) {
 		c.Error(core.NewAPIError(fmt.Sprintf("Check the URL. This host only handles orders of asset \"%v\".", orderBookC.assetID), 400))
 		return
 	}
-	var json orderbooks.OrderUpdate
+	var json orders.ExternalUpdate
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.Error(apiErrorInvalidJSON)
 		return

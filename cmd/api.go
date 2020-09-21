@@ -7,6 +7,7 @@ import (
 	"home-broker/core/implem/postgresql"
 	"home-broker/orders"
 	"log"
+	"strings"
 
 	"github.com/spf13/viper"
 
@@ -30,13 +31,14 @@ import (
 )
 
 // apiCmd represents the api command
-var apiCmd = &cobra.Command{
-	Use:   "api",
-	Short: "Start the API webserver",
-	Run:   runAPIServer,
-}
+var apiCmd *cobra.Command
 
 func init() {
+	apiCmd = &cobra.Command{
+		Use:   "api",
+		Short: "Start the API webserver",
+		Run:   runAPIServer,
+	}
 	rootCmd.AddCommand(apiCmd)
 
 	// Here you will define your flags and configuration settings.
@@ -47,16 +49,24 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// apiCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	apiCmd.Flags().StringP("orderbook-host", "o", "http://localhost:8081", "The order book host API for a specific asset. (ex: \"http://localhost:8081\"")
+	apiCmd.MarkFlagRequired("orderbook-host")
 }
 
 func runAPIServer(cmd *cobra.Command, args []string) {
-	// appConfig := config.NewAppConfigFromViper(viper.GetViper())
 	pgConfig := config.NewPostgreSQLConfigFromViper(viper.GetViper())
 	ginConfig := config.NewGinConfigFromViper(viper.GetViper())
 
+	orderBookHost, err := apiCmd.Flags().GetString("orderbook-host")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !strings.HasPrefix(orderBookHost, "http") {
+		log.Fatal("The order book host must have http:// or https://")
+	}
+
 	mainDB := postgresql.NewDB(pgConfig.Host, pgConfig.Port, pgConfig.User, pgConfig.Password, pgConfig.Name)
-	err := mainDB.Open()
+	err = mainDB.Open()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,7 +81,11 @@ func runAPIServer(cmd *cobra.Command, args []string) {
 	userUC := users.NewUserUseCases(userDB)
 	walletUC := wallets.NewWalletUseCases(walletDB, userUC)
 	assetWalletUC := assetwallets.NewAssetWalletUseCases(assetWalletDB, userUC)
-	orderUC := orders.NewOrderUseCases(orderDB, walletUC, assetWalletUC)
+	orderUC := orders.NewOrderUseCases(orderDB, walletUC, assetWalletUC, orderBookHost)
+
+	if ginConfig.Mode == "release" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	router := gin.Default()
 	router.Use(coregin.MiddlewareAPIError())

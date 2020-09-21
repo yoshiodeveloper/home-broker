@@ -23,34 +23,41 @@ type WebhookResponse struct {
 
 // Webhook process orders updates.
 // This is a non-concurrency process.
-func (orderBookUC OrderBookUseCases) Webhook(orderUpdate OrderUpdate) (WebhookResponse, error) {
-	order := orderUpdate.Order
-	if order.AssetID == "" {
-		return WebhookResponse{}, core.NewErrValidation("Order.AssetID is invalid")
+func (orderBookUC OrderBookUseCases) Webhook(externalUp orders.ExternalUpdate) (WebhookResponse, error) {
+	if externalUp.AssetID == "" {
+		return WebhookResponse{}, core.NewErrValidation("Asset ID is invalid")
 	}
-	if order.ExternalID == "" {
-		return WebhookResponse{}, core.NewErrValidation("Order.ExternalID is invalid")
+	if externalUp.ID == "" {
+		return WebhookResponse{}, core.NewErrValidation("ID (external) is invalid")
 	}
-	if order.ExternalTimestamp.IsZero() {
-		return WebhookResponse{}, core.NewErrValidation("Order.ExternalTimestamp is invalid")
+	if externalUp.Timestamp.IsZero() {
+		return WebhookResponse{}, core.NewErrValidation("Timestamp is invalid")
 	}
-	if order.Price == 0 {
-		return WebhookResponse{}, core.NewErrValidation("Order.Price is invalid")
+	if (externalUp.Type != orders.OrderTypeBuy) && (externalUp.Type != orders.OrderTypeSell) {
+		return WebhookResponse{}, core.NewErrValidation("Type is invalid")
 	}
-	if (order.Type != orders.OrderTypeBuy) && (order.Type != orders.OrderTypeSell) {
-		return WebhookResponse{}, core.NewErrValidation("Order.Type is invalid")
+
+	order := Order{ // this is not the same as "orders.Order" type.
+		ID:        externalUp.ID,
+		AssetID:   externalUp.AssetID,
+		Price:     externalUp.Price,
+		Amount:    externalUp.Amount,
+		Type:      externalUp.Type,
+		Timestamp: externalUp.Timestamp,
 	}
+
 	orderBookUC.orderBook.Lock()
 	defer orderBookUC.orderBook.Unlock()
 
-	switch orderUpdate.Type {
+	switch externalUp.Action {
 	case "added":
-		orderBookUC.orderBook.AddOrder(orderUpdate.Order)
+		orderBookUC.orderBook.AddOrder(order)
 	case "deleted":
-		orderBookUC.orderBook.RemoveOrder(orderUpdate.Order)
+		orderBookUC.orderBook.RemoveOrder(order)
 	case "traded":
-		orderBookUC.orderBook.DecOrderAmount(orderUpdate.Order)
+		orderBookUC.orderBook.DecOrderAmount(order)
 	}
+
 	return WebhookResponse{
 		BuyOrdersCount:  orderBookUC.orderBook.OrdersCount[orders.OrderTypeBuy],
 		SellOrdersCount: orderBookUC.orderBook.OrdersCount[orders.OrderTypeSell],

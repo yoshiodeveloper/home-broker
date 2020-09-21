@@ -5,19 +5,42 @@ import (
 	"home-broker/money"
 	"home-broker/orders"
 	"sync"
+	"time"
 )
 
-// OrderUpdate is a struct used to update de Order Book.
-type OrderUpdate struct {
-	Order orders.Order `json:"order"`
-	Type  string       `json:"type"` // added / deleted / traded
+// Order holds an order sent by an exchange service.
+// This not the same as "orders.Order".
+type Order struct {
+	ID        orders.ExternalOrderID `json:"id"`
+	AssetID   assets.AssetID         `json:"asset_id"`
+	Price     money.Money            `json:"price"`
+	Amount    assets.AssetUnit       `json:"amount"`
+	Type      orders.OrderType       `json:"type"`
+	Timestamp time.Time              `json:"timestamp"`
+}
+
+// BetterThan returns true if this order is better offer than order parameter.
+func (o Order) BetterThan(order Order) bool {
+	/*
+		// These checks are not been used, as we check the order already inside a price level (at same price).
+		if o.Type == OrderTypeBuy && o.Price > order.Price {
+			return true
+		}
+		if o.Type == OrderTypeSell && o.Price < order.Price {
+			return true
+		}
+	*/
+	if o.Timestamp.Before(order.Timestamp) {
+		return true
+	}
+	return false
 }
 
 // PriceLevelOrder is a struct for an order inside OrderBookPriceLevel.
 type PriceLevelOrder struct {
 	Left  *PriceLevelOrder
 	Right *PriceLevelOrder
-	Order orders.Order
+	Order Order
 }
 
 // PriceLevel is a struct for a price level of buying or selling orders.
@@ -95,7 +118,7 @@ func (ob *OrderBook) Unlock() {
 }
 
 // addNewPriceLevel adds a new PriceLevel into the OrderBook.
-func (ob *OrderBook) addNewPriceLevel(order orders.Order) *PriceLevel {
+func (ob *OrderBook) addNewPriceLevel(order Order) *PriceLevel {
 	priceLevel := &PriceLevel{Price: order.Price, Type: order.Type}
 	ob.PriceLevelsByPrices[priceLevel.Type][priceLevel.Price] = priceLevel
 
@@ -129,7 +152,7 @@ func (ob *OrderBook) addNewPriceLevel(order orders.Order) *PriceLevel {
 	return priceLevel
 }
 
-func (ob *OrderBook) addNewPriceLevelOrder(order orders.Order) {
+func (ob *OrderBook) addNewPriceLevelOrder(order Order) {
 	priceLevel, _ := ob.PriceLevelsByPrices[order.Type][order.Price]
 	if priceLevel == nil {
 		priceLevel = ob.addNewPriceLevel(order)
@@ -138,12 +161,12 @@ func (ob *OrderBook) addNewPriceLevelOrder(order orders.Order) {
 	priceLevel.AmountSum += order.Amount
 	priceLevel.OrdersCount++
 
-	plOrder := ob.OrdersByOrderID[order.ExternalID]
+	plOrder := ob.OrdersByOrderID[order.ID] // this ID is an external ID
 	if plOrder != nil {
 		return
 	}
 	plOrder = &PriceLevelOrder{Order: order}
-	ob.OrdersByOrderID[plOrder.Order.ExternalID] = plOrder
+	ob.OrdersByOrderID[plOrder.Order.ID] = plOrder
 	ob.OrdersCount[order.Type]++
 
 	if priceLevel.OrderHead == nil {
@@ -174,13 +197,13 @@ func (ob *OrderBook) addNewPriceLevelOrder(order orders.Order) {
 }
 
 // AddOrder adds an order into the OrderBook.
-func (ob *OrderBook) AddOrder(order orders.Order) {
+func (ob *OrderBook) AddOrder(order Order) {
 	ob.addNewPriceLevelOrder(order)
 }
 
 // DecOrderAmount decrement an order amount.
-func (ob *OrderBook) DecOrderAmount(order orders.Order) {
-	plOrder := ob.OrdersByOrderID[order.ExternalID]
+func (ob *OrderBook) DecOrderAmount(order Order) {
+	plOrder := ob.OrdersByOrderID[order.ID]
 	if plOrder == nil {
 		return
 	}
@@ -191,13 +214,13 @@ func (ob *OrderBook) DecOrderAmount(order orders.Order) {
 }
 
 // RemoveOrder removes an order from the OrderBook.
-func (ob *OrderBook) RemoveOrder(order orders.Order) {
+func (ob *OrderBook) RemoveOrder(order Order) {
 	priceLevel, _ := ob.PriceLevelsByPrices[order.Type][order.Price]
 	if priceLevel == nil {
 		return
 	}
 
-	plOrder := ob.OrdersByOrderID[order.ExternalID]
+	plOrder := ob.OrdersByOrderID[order.ID]
 	if plOrder == nil {
 		return
 	}
@@ -215,28 +238,28 @@ func (ob *OrderBook) RemoveOrder(order orders.Order) {
 	plOrder.Left = nil
 	plOrder.Right = nil
 
-	delete(ob.OrdersByOrderID, order.ExternalID)
+	delete(ob.OrdersByOrderID, order.ID)
 	ob.OrdersCount[order.Type]--
 	priceLevel.AmountSum -= order.Amount
 	priceLevel.OrdersCount--
 }
 
 // GetBuyOrders returns a slice of buying orders.
-func (ob *OrderBook) GetBuyOrders() []orders.Order {
+func (ob *OrderBook) GetBuyOrders() []Order {
 	orders := ob.getOrders(orders.OrderTypeBuy)
 	return *orders
 }
 
 // GetSellOrders returns a slice of selling orders.
-func (ob *OrderBook) GetSellOrders() []orders.Order {
+func (ob *OrderBook) GetSellOrders() []Order {
 	orders := ob.getOrders(orders.OrderTypeSell)
 	return *orders
 }
 
 // getOrders returns a slice of buying or selling orders.
-func (ob *OrderBook) getOrders(orderType orders.OrderType) *[]orders.Order {
+func (ob *OrderBook) getOrders(orderType orders.OrderType) *[]Order {
 	currPriceLevel := ob.PriceLevelsHeads[orderType]
-	orders := make([]orders.Order, 0, ob.OrdersCount[orderType])
+	orders := make([]Order, 0, ob.OrdersCount[orderType])
 	for currPriceLevel != nil {
 		currPLOrder := currPriceLevel.OrderHead
 		for currPLOrder != nil {

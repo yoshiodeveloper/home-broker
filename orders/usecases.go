@@ -1,6 +1,8 @@
 package orders
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"home-broker/assets"
 	"home-broker/assetwallets"
@@ -8,7 +10,10 @@ import (
 	"home-broker/money"
 	"home-broker/users"
 	"home-broker/wallets"
+	"io/ioutil"
+	"log"
 	"math"
+	"net/http"
 	"time"
 )
 
@@ -17,11 +22,12 @@ type OrderUseCases struct {
 	db            OrderDBInterface
 	walletUC      wallets.WalletUseCases
 	assetWalletUC assetwallets.AssetWalletUseCases
+	orderBookHost string
 }
 
 // NewOrderUseCases returns a new OrderUseCases.
-func NewOrderUseCases(db OrderDBInterface, walletUC wallets.WalletUseCases, assetWalletUC assetwallets.AssetWalletUseCases) OrderUseCases {
-	return OrderUseCases{db: db, walletUC: walletUC, assetWalletUC: assetWalletUC}
+func NewOrderUseCases(db OrderDBInterface, walletUC wallets.WalletUseCases, assetWalletUC assetwallets.AssetWalletUseCases, orderBookHost string) OrderUseCases {
+	return OrderUseCases{db: db, walletUC: walletUC, assetWalletUC: assetWalletUC, orderBookHost: orderBookHost}
 }
 
 // ExchangeOrderResponse represents a send order response of a exchange.
@@ -195,17 +201,30 @@ func (uc OrderUseCases) CancelOrder(orderID OrderID) (*Order, error) {
 // ProcessExternalUpdate process an order update received from an exchange service.
 // These updates change the state of an Order Book.
 func (uc OrderUseCases) ProcessExternalUpdate(externalUp ExternalUpdate) error {
-
-	var err error
-	switch externalUp.Action {
-	case ExternalUpdateActionAdded:
-		err = uc.processExternalUpdateAdded(externalUp)
-	case ExternalUpdateActionDeleted:
-		err = uc.processExternalUpdateDeleted(externalUp)
-	case ExternalUpdateActionTraded:
+	err := uc.updateOrderBook(externalUp)
+	if err != nil {
+		log.Printf("error to update order book: %v\n", err)
+	}
+	if externalUp.Action == ExternalUpdateActionTraded {
 		err = uc.processExternalUpdateTraded(externalUp)
 	}
 	return err
+}
+
+func (uc OrderUseCases) updateOrderBook(externalUp ExternalUpdate) error {
+	url := fmt.Sprintf("%s/api/v1/orderbooks/%s/webhook", uc.orderBookHost, externalUp.AssetID)
+	log.Printf("sending to order book on %s...\n", url)
+	json, err := json.Marshal(externalUp)
+	resp, err := http.Post(url, "application/json; charset=utf-8", bytes.NewBuffer(json))
+	if err != nil {
+
+		return err
+	}
+	defer resp.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyString := string(bodyBytes)
+	log.Printf("response: %s\n", bodyString)
+	return nil
 }
 
 func (uc OrderUseCases) processExternalUpdateAdded(externalUp ExternalUpdate) error {
