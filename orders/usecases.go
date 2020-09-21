@@ -8,6 +8,7 @@ import (
 	"home-broker/money"
 	"home-broker/users"
 	"home-broker/wallets"
+	"math"
 	"time"
 )
 
@@ -189,6 +190,73 @@ func (uc OrderUseCases) CancelOrder(orderID OrderID) (*Order, error) {
 		entity, err = uc.db.GetByID(entity.ID)
 	}
 	return entity, err
+}
+
+// ProcessExternalUpdate process an order update received from an exchange service.
+// These updates change the state of an Order Book.
+func (uc OrderUseCases) ProcessExternalUpdate(externalUp ExternalUpdate) error {
+
+	var err error
+	switch externalUp.Action {
+	case ExternalUpdateActionAdded:
+		err = uc.processExternalUpdateAdded(externalUp)
+	case ExternalUpdateActionDeleted:
+		err = uc.processExternalUpdateDeleted(externalUp)
+	case ExternalUpdateActionTraded:
+		err = uc.processExternalUpdateTraded(externalUp)
+	}
+	return err
+}
+
+func (uc OrderUseCases) processExternalUpdateAdded(externalUp ExternalUpdate) error {
+	return nil
+}
+
+func (uc OrderUseCases) processExternalUpdateDeleted(externalUp ExternalUpdate) error {
+	return nil
+}
+
+func (uc OrderUseCases) processExternalUpdateTraded(externalUp ExternalUpdate) error {
+	entity, err := uc.db.GetByExternalIDAssetID(externalUp.ID, externalUp.AssetID)
+	if err != nil {
+		return err
+	}
+	if entity == nil {
+		// The user and/or asset is not from this home broker.
+		return nil
+	}
+
+	// TODO: This is not the best way.
+	// We should put everything inside a transaction.
+	switch entity.Type {
+	case OrderTypeBuy:
+		// On buy, we remove money and add assets.
+		valueMoney := money.Money(math.Abs(float64(int64(externalUp.Amount) * int64(externalUp.Price))))
+		valueMoney *= -1
+		_, err = uc.walletUC.IncBalanceByUserID(entity.UserID, valueMoney)
+		if err != nil {
+			return err
+		}
+		amountAssets := assets.AssetUnit(math.Abs(float64(externalUp.Amount)))
+		_, err = uc.assetWalletUC.IncBalanceByUserIDAssetID(entity.UserID, entity.AssetID, amountAssets)
+		if err != nil {
+			return err
+		}
+	case OrderTypeSell:
+		// On sell, we add money and remove assets.
+		valueMoney := money.Money(math.Abs(float64(int64(entity.Amount) * int64(entity.Price))))
+		_, err = uc.walletUC.IncBalanceByUserID(entity.UserID, valueMoney)
+		if err != nil {
+			return err
+		}
+		amountAssets := assets.AssetUnit(math.Abs(float64(entity.Amount)))
+		amountAssets *= -1
+		_, err = uc.assetWalletUC.IncBalanceByUserIDAssetID(entity.UserID, entity.AssetID, amountAssets)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // sendOrderToExchange sends an order to the exchange.

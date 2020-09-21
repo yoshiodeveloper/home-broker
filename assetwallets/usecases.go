@@ -93,14 +93,26 @@ func (uc AssetWalletUseCases) GetAssetWallet(userID users.UserID, assetID assets
 // AddFunds increments the asset wallet funds (balance).
 // The wallet will be created if it does not exist.
 func (uc AssetWalletUseCases) AddFunds(userID users.UserID, assetID assets.AssetID, amount assets.AssetUnit) (entity *AssetWallet, err error) {
+
+	if amount <= 0 {
+		return nil, core.NewErrValidation("Invalid amount.")
+	}
+
+	entity, err = uc.IncBalanceByUserIDAssetID(userID, assetID, amount)
+	if err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
+// IncBalanceByUserIDAssetID increments or decrement the asset wallet funds (balance).
+// The wallet will be created if it does not exist.
+func (uc AssetWalletUseCases) IncBalanceByUserIDAssetID(userID users.UserID, assetID assets.AssetID, amount assets.AssetUnit) (entity *AssetWallet, err error) {
 	if userID <= 0 {
 		return nil, core.NewErrValidation("Invalid user ID.")
 	}
 	if assetID == "" {
 		return nil, core.NewErrValidation("Invalid asset ID.")
-	}
-	if amount <= 0 {
-		return nil, core.NewErrValidation("Invalid amount.")
 	}
 
 	_, _, _, err = uc.GetAssetWallet(userID, assetID) // forces asset wallet/user creation

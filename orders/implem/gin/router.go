@@ -21,6 +21,7 @@ func (wr OrderRouter) SetupRouter(router *gin.Engine) {
 	orderC := NewOrderController(wr.uc)
 	v1 := router.Group("/api/v1/orders")
 	{
+		v1.POST("webhook/", orderC.Webhook)
 		v1.POST("buy/", orderC.BuyOrder)
 		v1.POST("sell/", orderC.SellOrder)
 		v1.GET(":order_id/", orderC.GetOrder)

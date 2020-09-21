@@ -114,6 +114,21 @@ func (orderDB OrderDB) GetByID(id orders.OrderID) (*orders.Order, error) {
 	return &entity, nil
 }
 
+// GetByExternalIDAssetID returns an order by external ID and asset ID.
+// If the record does not exist a nil entity will be returned.
+func (orderDB OrderDB) GetByExternalIDAssetID(externalID orders.ExternalOrderID, assetID assets.AssetID) (*orders.Order, error) {
+	model := OrderModel{}
+	res := orderDB.db.GetDB().Where(`"external_id"=? AND "asset_id"=?`, externalID, assetID).Take(&model)
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	entity := orderDB.ToEntity(model)
+	return &entity, nil
+}
+
 // Insert inserts a new order.
 // A nil entity will be returned if an error occurs.
 // The following errors can happen: ErrUserDoesNotExist.

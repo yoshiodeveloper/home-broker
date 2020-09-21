@@ -2,30 +2,47 @@ package cmd
 
 import (
 	"fmt"
+	"home-broker/assets"
+	"home-broker/config"
+	coregin "home-broker/core/implem/gin"
+	"home-broker/orderbooks"
+	orderbooksgin "home-broker/orderbooks/implem/gin"
+	"log"
 
+	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // orderbookCmd represents the orderbook command
 var orderbookCmd = &cobra.Command{
 	Use:   "orderbook",
 	Short: "Starts the order book service",
-	Long:  `You must have only one instance of the order book service.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("orderbook called")
-	},
+	Long:  `Important: You must have only one instance of the order book service.`,
+	Run:   startOrderBook,
 }
 
 func init() {
 	rootCmd.AddCommand(orderbookCmd)
+	orderbookCmd.Flags().String("asset", "VIBR", "The asset ID this Order Book must handle.")
+}
 
-	// Here you will define your flags and configuration settings.
+func startOrderBook(cmd *cobra.Command, args []string) {
+	ginConfig := config.NewGinConfigFromViper(viper.GetViper())
+	assetID, err := cmd.Flags().GetString("asset")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// orderbookCmd.PersistentFlags().String("foo", "", "A help for foo")
+	orderBook := orderbooks.NewOrderBook(assets.AssetID(assetID))
+	orderBookUC := orderbooks.NewOrderBookUseCases(orderBook)
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// orderbookCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	router := gin.Default()
+	router.Use(coregin.MiddlewareAPIError())
+
+	orderBookRouter := orderbooksgin.NewOrderBookRouter(orderBook.AssetID, orderBookUC)
+	orderBookRouter.SetupRouter(router)
+
+	log.Printf("\n\n#\n# IMPORTANT: You must execute only one instance of the Order Book for asset \"%v\"\n#\n", assetID)
+	router.Run(fmt.Sprintf(":%d", ginConfig.Port))
 }

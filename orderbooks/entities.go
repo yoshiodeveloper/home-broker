@@ -4,7 +4,14 @@ import (
 	"home-broker/assets"
 	"home-broker/money"
 	"home-broker/orders"
+	"sync"
 )
+
+// OrderUpdate is a struct used to update de Order Book.
+type OrderUpdate struct {
+	Order orders.Order `json:"order"`
+	Type  string       `json:"type"` // added / deleted / traded
+}
 
 // PriceLevelOrder is a struct for an order inside OrderBookPriceLevel.
 type PriceLevelOrder struct {
@@ -44,13 +51,17 @@ func (pl PriceLevel) BetterOfferThan(priceLevel PriceLevel) bool {
 
 // OrderBook holds the buying and selling orders of an asset.
 type OrderBook struct {
+	// Only one goroutine can perfom operations in this Order Book at time.
+	mux sync.Mutex
+
 	AssetID assets.AssetID
 
 	// ordersByOrderID maps an Order ID to a PriceLevelOrder.
+	// The ID is the external ID (from the exchange).
 	// This improves the search of a order inside the order book at O(1).
 	// The downside is the rehash of a hashmap.
 	// This can be improved with a AVL BTree.
-	OrdersByOrderID map[orders.OrderID]*PriceLevelOrder
+	OrdersByOrderID map[orders.ExternalOrderID]*PriceLevelOrder
 
 	PriceLevelsByPrices map[orders.OrderType]map[money.Money]*PriceLevel
 	PriceLevelsHeads    map[orders.OrderType]*PriceLevel // linked list for buying and selling
@@ -58,10 +69,10 @@ type OrderBook struct {
 }
 
 // NewOrderBook creates a new OrderBook.
-func NewOrderBook(assetID assets.AssetID) OrderBook {
+func NewOrderBook(assetID assets.AssetID) *OrderBook {
 	ob := OrderBook{
 		AssetID:         assetID,
-		OrdersByOrderID: make(map[orders.OrderID]*PriceLevelOrder),
+		OrdersByOrderID: make(map[orders.ExternalOrderID]*PriceLevelOrder),
 		PriceLevelsByPrices: map[orders.OrderType]map[money.Money]*PriceLevel{
 			orders.OrderTypeBuy:  make(map[money.Money]*PriceLevel),
 			orders.OrderTypeSell: make(map[money.Money]*PriceLevel),
@@ -69,7 +80,18 @@ func NewOrderBook(assetID assets.AssetID) OrderBook {
 		PriceLevelsHeads: make(map[orders.OrderType]*PriceLevel),
 		OrdersCount:      make(map[orders.OrderType]int64),
 	}
-	return ob
+	return &ob
+}
+
+// Lock locks for thread safety.
+// Call this before any operation.
+func (ob *OrderBook) Lock() {
+	ob.mux.Lock()
+}
+
+// Unlock unlocks for thread safety.
+func (ob *OrderBook) Unlock() {
+	ob.mux.Unlock()
 }
 
 // addNewPriceLevel adds a new PriceLevel into the OrderBook.
@@ -116,8 +138,12 @@ func (ob *OrderBook) addNewPriceLevelOrder(order orders.Order) {
 	priceLevel.AmountSum += order.Amount
 	priceLevel.OrdersCount++
 
-	plOrder := &PriceLevelOrder{Order: order}
-	ob.OrdersByOrderID[plOrder.Order.ID] = plOrder
+	plOrder := ob.OrdersByOrderID[order.ExternalID]
+	if plOrder != nil {
+		return
+	}
+	plOrder = &PriceLevelOrder{Order: order}
+	ob.OrdersByOrderID[plOrder.Order.ExternalID] = plOrder
 	ob.OrdersCount[order.Type]++
 
 	if priceLevel.OrderHead == nil {
@@ -152,6 +178,18 @@ func (ob *OrderBook) AddOrder(order orders.Order) {
 	ob.addNewPriceLevelOrder(order)
 }
 
+// DecOrderAmount decrement an order amount.
+func (ob *OrderBook) DecOrderAmount(order orders.Order) {
+	plOrder := ob.OrdersByOrderID[order.ExternalID]
+	if plOrder == nil {
+		return
+	}
+	plOrder.Order.Amount -= order.Amount
+	if plOrder.Order.Amount <= 0 {
+		ob.RemoveOrder(order)
+	}
+}
+
 // RemoveOrder removes an order from the OrderBook.
 func (ob *OrderBook) RemoveOrder(order orders.Order) {
 	priceLevel, _ := ob.PriceLevelsByPrices[order.Type][order.Price]
@@ -159,7 +197,7 @@ func (ob *OrderBook) RemoveOrder(order orders.Order) {
 		return
 	}
 
-	plOrder := ob.OrdersByOrderID[order.ID]
+	plOrder := ob.OrdersByOrderID[order.ExternalID]
 	if plOrder == nil {
 		return
 	}
@@ -177,20 +215,20 @@ func (ob *OrderBook) RemoveOrder(order orders.Order) {
 	plOrder.Left = nil
 	plOrder.Right = nil
 
-	delete(ob.OrdersByOrderID, order.ID)
+	delete(ob.OrdersByOrderID, order.ExternalID)
 	ob.OrdersCount[order.Type]--
 	priceLevel.AmountSum -= order.Amount
 	priceLevel.OrdersCount--
 }
 
 // GetBuyOrders returns a slice of buying orders.
-func (ob OrderBook) GetBuyOrders() []orders.Order {
+func (ob *OrderBook) GetBuyOrders() []orders.Order {
 	orders := ob.getOrders(orders.OrderTypeBuy)
 	return *orders
 }
 
 // GetSellOrders returns a slice of selling orders.
-func (ob OrderBook) GetSellOrders() []orders.Order {
+func (ob *OrderBook) GetSellOrders() []orders.Order {
 	orders := ob.getOrders(orders.OrderTypeSell)
 	return *orders
 }

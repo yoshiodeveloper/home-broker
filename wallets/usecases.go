@@ -78,6 +78,19 @@ func (uc WalletUseCases) GetWallet(userID users.UserID) (entity *Wallet, created
 	return nil, false, userCreated, err
 }
 
+// IncBalanceByUserID increments or decrement the balance.
+func (uc WalletUseCases) IncBalanceByUserID(userID users.UserID, amount money.Money) (entity *Wallet, err error) {
+	if userID <= 0 {
+		return nil, core.NewErrValidation("Invalid user ID.")
+	}
+	// We leave this job to the ORM as it can optimize this process in a single call.
+	entity, err = uc.db.IncBalanceByUserID(userID, amount)
+	if err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
 // AddFunds increments the wallet funds (balance).
 // The wallet will be created if it does not exist.
 func (uc WalletUseCases) AddFunds(userID users.UserID, amount money.Money) (entity *Wallet, err error) {
@@ -87,6 +100,7 @@ func (uc WalletUseCases) AddFunds(userID users.UserID, amount money.Money) (enti
 	if amount <= 0 {
 		return nil, core.NewErrValidation("Invalid amount.")
 	}
+
 	_, _, _, err = uc.GetWallet(userID) // forces wallet/user creation
 	if err != nil {
 		return nil, err

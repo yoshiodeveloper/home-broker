@@ -14,9 +14,6 @@ import (
 
 var (
 	apiErrorInvalidJSON    = core.NewAPIError("Invalid JSON.", 400)
-	apiErrorNoFunds        = core.NewAPIError("No funds available.", 400)
-	apiErrorInvalidPrice   = core.NewAPIError("Invalid price.", 400)
-	apiErrorInvalidAmount  = core.NewAPIError("Invalid amount.", 400)
 	apiErrorInvalidOrderID = core.NewAPIError("Invalid order ID.", 400)
 	apiErrorInvalidUserID  = core.NewAPIError("Invalid user ID.", 400)
 	apiErrorInvalidAssetID = core.NewAPIError("Invalid asset ID.", 400)
@@ -27,7 +24,7 @@ type OrderController struct {
 	uc orders.OrderUseCases
 }
 
-// NewOrderController creates a new WalletController.
+// NewOrderController creates a new OrderController.
 func NewOrderController(uc orders.OrderUseCases) OrderController {
 	return OrderController{uc: uc}
 }
@@ -118,4 +115,21 @@ func (orderC OrderController) CancelOrder(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, entity)
+}
+
+// Webhook receives the order updates from an exchange service.
+// These updates are sent by an exchange service.
+func (orderC OrderController) Webhook(c *gin.Context) {
+	var json orders.ExternalUpdate
+	if err := c.ShouldBindJSON(&json); err != nil {
+		c.Error(apiErrorInvalidJSON)
+		return
+	}
+
+	err := orderC.uc.ProcessExternalUpdate(json)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

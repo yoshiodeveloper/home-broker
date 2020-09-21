@@ -31,7 +31,7 @@ type AssetWalletModel struct {
 // TableName returns the real table name of AssetWallet.
 // It is used by GORM to perfom operations on asset wallet table (queries, migrations, etc.).
 func (AssetWalletModel) TableName() string {
-	return "walletasset"
+	return "assetwallet"
 }
 
 // AssetWalletDB handles database commands for asset wallet table.
@@ -132,7 +132,7 @@ func (assetWalletDB AssetWalletDB) IncBalanceByUserIDAssetID(userID users.UserID
 	updatedAt := time.Now()
 	res := assetWalletDB.db.GetDB().
 		Table("assetwallet").
-		Where(`"user_id"=? AND "asset_id"=? "deleted_at" IS NULL`, userID, assetID).
+		Where(`"user_id"=? AND "asset_id"=? AND "deleted_at" IS NULL`, userID, assetID).
 		Updates(map[string]interface{}{
 			"balance":    gorm.Expr(`"balance"+?`, amount),
 			"updated_at": updatedAt,

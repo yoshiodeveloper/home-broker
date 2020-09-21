@@ -47,6 +47,15 @@ const (
 
 	// OrderStatusCanceled is a canceled order.
 	OrderStatusCanceled = "canceled"
+
+	// ExternalUpdateActionAdded is an order added to the order book.
+	ExternalUpdateActionAdded = "added"
+
+	// ExternalUpdateActionDeleted is an order removed from the order book.
+	ExternalUpdateActionDeleted = "deleted"
+
+	// ExternalUpdateActionTraded is an order traded and must be removed from the order book.
+	ExternalUpdateActionTraded = "traded"
 )
 
 // Order is an entity for buying or selling intentions.
@@ -100,4 +109,15 @@ func (o Order) BetterThan(order Order) bool {
 		return true
 	}
 	return false
+}
+
+// ExternalUpdate holds an order update sent by an exchange service.
+type ExternalUpdate struct {
+	ID        ExternalOrderID  `json:"id"`
+	AssetID   assets.AssetID   `json:"asset_id"`
+	Price     money.Money      `json:"price"`
+	Amount    assets.AssetUnit `json:"amount"`
+	Type      OrderType        `json:"type"`
+	Action    string           `json:"action"` // added / deleted / traded
+	Timestamp time.Time        `json:"timestamp"`
 }

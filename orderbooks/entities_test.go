@@ -1,6 +1,7 @@
 package orderbooks_test
 
 import (
+	"home-broker/assets"
 	"home-broker/money"
 	"home-broker/orderbooks"
 	"home-broker/orders"
@@ -25,7 +26,7 @@ func TestOrderAddOrder_AddManyBuyOrders_BuyOrdersAddedSorted(t *testing.T) {
 			// Creates 10 equals prices (same price level).
 			price -= money.Money(1) // decrementing
 		}
-		order := testsorders.GetOrder(orders.OrderID(i+1), orders.OrderTypeBuy, price, int64(i+1), exTime)
+		order := testsorders.GetOrder(orders.OrderID(i+1), orders.OrderTypeBuy, price, assets.AssetUnit(i+1), exTime)
 		expectedOrders = append(expectedOrders, order)
 		insertionOrders = append(insertionOrders, order)
 		if i%2 == 0 {
@@ -84,7 +85,7 @@ func TestOrderAddOrder_AddManySellOrders_SellOrdersAddedSorted(t *testing.T) {
 			// Creates 10 equals prices (same price level).
 			price += money.Money(1) // incrementing
 		}
-		order := testsorders.GetOrder(orders.OrderID(i+1), orders.OrderTypeSell, price, int64(i+1), exTime)
+		order := testsorders.GetOrder(orders.OrderID(i+1), orders.OrderTypeSell, price, assets.AssetUnit(i+1), exTime)
 		expectedOrders = append(expectedOrders, order)
 		insertionOrders = append(insertionOrders, order)
 		if i%2 == 0 {
@@ -141,7 +142,7 @@ func BenchmarkOderBookInsertion(b *testing.B) {
 			orderType = orders.OrderTypeSell
 		}
 		orderID := orders.OrderID(rand.Int63() + 1)
-		amount := rand.Int63n(10000) + 1
+		amount := assets.AssetUnit(rand.Int63n(10000) + 1)
 		exTime := time.Now()
 		// 100k price levels (ex: $0.01 ~ $1000.01)
 		price := money.Money(rand.Int63n(100000) + 1)
@@ -161,7 +162,7 @@ func BenchmarkOderBookSnapshots(b *testing.B) {
 			orderType = orders.OrderTypeSell
 		}
 		orderID := orders.OrderID(rand.Int63() + 1)
-		amount := rand.Int63n(10000) + 1
+		amount := assets.AssetUnit(rand.Int63n(10000) + 1)
 		exTime := time.Now()
 		// 100k price levels (ex: $0.01 ~ $1000.01)
 		price := money.Money(rand.Int63n(100000) + 1)
