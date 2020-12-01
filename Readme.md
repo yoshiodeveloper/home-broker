@@ -55,12 +55,6 @@ Examples:
 
 > In this example "postgresql/implementations.go" and "gin/implementations.go" uses the interfaces (abstract classes) of "business_rules_and_interfaces.go". To add a new DB just implement the interfaces and set the selected DB on the start up (e.g. by config or shell parameter).
 
-# Diagram
-
-![Diagram](./docs/diagram.png)
-
-Notice that this is not the desired architecture. The communication should be done with Kafka or similar, but it was not implemented at the moment.
-
 **Assumptions**
 
 Some important assumptions have been made:
